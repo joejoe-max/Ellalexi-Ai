@@ -11,8 +11,8 @@ export function classifyProviderError(status,payload={},cause){
  if(status===400)return {kind:"invalid_request",retry:false,httpStatus:422,message:"This request could not be processed. Check the uploaded content and try again."};
  return {kind:"provider_error",retry:false,httpStatus:502,message:"EllaLexi could not complete this request. Please try again."};
 }
-export async function generateWithFallback({parts,systemInstruction,generationConfig,tools,timeout=90000,onFallback,fetchImpl=fetch,allowEmptyText=false}){
- const key=process.env.GEMINI_API_KEY;
+export async function generateWithFallback({parts,systemInstruction,generationConfig,tools,timeout=90000,onFallback,fetchImpl=fetch,allowEmptyText=false,apiKey:suppliedApiKey}){
+ const key=suppliedApiKey||process.env.GEMINI_API_KEY;
  if(!key)throw Object.assign(new Error("AI is not configured."),{kind:"configuration",httpStatus:503,userMessage:"EllaLexi's AI service is not configured yet. Please try again later."});
  const models=getModels();let last;
  for(let i=0;i<models.length;i++){
