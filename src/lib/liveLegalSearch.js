@@ -1,4 +1,4 @@
-const MODEL = "gemini-2.5-flash";
+import {generateWithFallback} from "../../api/_lib/gemini.js";
 const TRUSTED_HOSTS = [
   { suffix: ".gov.ng", publisher: "Nigerian government website", authority: "official_government" },
   { suffix: "nass.gov.ng", publisher: "National Assembly of Nigeria", authority: "official_government" },
@@ -54,13 +54,8 @@ export async function searchLiveLegalSources(query, { apiKey, fetchImpl = fetch 
     "Issue: " + String(query).slice(0, 8500)
   ].join("\n");
   try {
-    const response = await fetchImpl("https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent", {
-      method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.1, maxOutputTokens: 1800 } }),
-      signal: AbortSignal.timeout(25000)
-    });
-    if (!response.ok) throw new Error("Grounded search failed");
-    const payload = await response.json();
+    const generated = await generateWithFallback({parts:[{text:prompt}],generationConfig:{temperature:0.1,maxOutputTokens:1800},tools:[{google_search:{}}],timeout:25000,fetchImpl,allowEmptyText:true,apiKey});
+    const payload=generated.payload;
     const candidates = normalizeGroundingChunks(payload.candidates?.[0]?.groundingMetadata?.groundingChunks || []);
     const sources = (await Promise.all(candidates.map(async candidate => {
       try {
