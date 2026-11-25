@@ -1,23 +1,22 @@
-# Stage 4 — Nigerian Legal Knowledge Base and Retrieval
+# Stage 4 — MVP Nigerian legal-source retrieval
 
-## Implemented
-- Separate legal-source registry; user agreements are never ingested into this persistent store.
-- Mandatory provenance, jurisdiction, document type, publication/effective dates, legal status, verification date and reuse/permission metadata.
-- Approval gate rejects missing metadata, unapproved sources, invalid statuses and permission-required material without recorded permission.
-- Gemini File Search ingestion with source metadata and controlled chunking.
-- POST /api/legal/verify retrieves from the configured legal store and returns structured legal comparisons, limitations and inspectable source passages.
-- Upload analysis invokes legal verification as a separate section when configured. If the store is not configured, document analysis remains available and legal review is marked unavailable.
-- Legal findings separate document positions from legal positions. Currentness is not assumed.
+## MVP decision
+Gemini File Search and a persistent legal knowledge store are deferred. The MVP uses a replaceable source-retrieval module and a small configured source registry. No File Search store or GEMINI_LEGAL_STORE is required.
+
+## Current retrieval path
+- `src/lib/legalSources.js` lists the source catalogue.
+- `src/lib/legalSourceRetrieval.js` fetches the historical Nigerian federal-law Markdown index, ranks legislation titles against document-analysis terms and retrieves a small number of matching texts.
+- `POST /api/legal/verify` sends the retrieved excerpts and compact document analysis to Gemini 2.5 Flash.
+- The model must cite supplied source IDs. The API rejects findings that cite missing source IDs.
+- User-uploaded agreements are not added to the source catalogue or retained.
+
+## Source limitations
+The initial searchable repository is a historical federal-law collection. It is useful for MVP workflow testing, not proof of current Nigerian law. Its index includes material of different ages and must not be presented as a complete, current or authoritative consolidated code. State legislation and judgments are not yet automatically searchable. Official National Assembly, Federal Ministry of Justice and Supreme Court portals are listed as reference destinations but are not yet crawled or queried.
+
+If relevant text cannot be retrieved, EllaLexi must say so. It must not fill the gap with general model knowledge. Currentness, amendments, repeal, commencement and state-specific applicability remain unresolved unless verified from the retrieved source itself.
 
 ## Configuration
-- GEMINI_API_KEY: server-side Gemini API key.
-- GEMINI_LEGAL_STORE: existing Gemini File Search store resource name, e.g. fileSearchStores/....
-- Keep both values server-side; never use VITE_ prefixes.
+Only `GEMINI_API_KEY` is needed for AI analysis and legal-source comparison. Keep it server-side; never use a VITE_ prefix. Gemini File Search configuration and ingestion scripts are deferred until a later upgrade.
 
-## Populate the library
-Review legal-library/README.md and manifest.example.json. Put approved source documents under legal-library/, create manifest.json, complete evidence fields and explicitly approve each source. Run npm run legal:ingest with both environment variables. Inspect indexed documents and test retrieval before enabling the store in production.
-
-No Nigerian statute, judgment or secondary-source document has been silently added in this commit. Public availability is not proof of reuse permission, currentness or legal authority. The initial manifest is intentionally empty.
-
-## Limitations
-A real corpus still needs to be sourced, permission-checked, reviewed and indexed. File Search results are not automatically authoritative or current. State-specific law, commencement, amendments, repeals and case-law treatment depend on corpus quality. Actual Gemini retrieval requires the API key and configured store and cannot be exercised in CI without them.
+## Upgrade path
+The `retrieveLegalSources` interface is isolated from the verification endpoint. It can later be replaced or extended with Gemini File Search or another retrieval backend without changing the analysis UI contract.
