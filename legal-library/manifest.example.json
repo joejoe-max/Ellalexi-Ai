@@ -1,0 +1,19 @@
+{
+  "sources": [
+    {
+      "file": "legal-library/approved-source.pdf",
+      "title": "Exact title as published",
+      "jurisdiction": "Federal",
+      "documentType": "Act",
+      "sourceUrl": "https://official-source.gov.ng/path/to/publication.pdf",
+      "sourcePublisher": "Name of official publisher",
+      "publicationDate": "YYYY-MM-DD",
+      "effectiveDate": "unknown",
+      "legalStatus": "unknown",
+      "verifiedOn": "YYYY-MM-DD",
+      "licence": "public_reuse_confirmed",
+      "approvedForIndex": false,
+      "mimeType": "application/pdf"
+    }
+  ]
+}

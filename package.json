@@ -1,7 +1,7 @@
 {
   "name": "ellalexi-ai",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,8 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest",
-    "test:run": "vitest run",
-    "legal:ingest": "node scripts/ingest-legal-library.js"
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.13",
@@ -37,4 +36,4 @@
     "vite": "^7.1.4",
     "vitest": "^3.2.4"
   }
-}\n
+}
