@@ -9,8 +9,15 @@ const MAX_EXCERPT_CHARS = 14000;
 const INDEX_CACHE_TTL_MS = 5 * 60 * 1000;
 const indexCache = new Map();
 
+function normalizeTerm(word) {
+  if (word.endsWith("ies") && word.length > 4) return word.slice(0, -3) + "y";
+  if (word.endsWith("s") && !word.endsWith("ss") && word.length > 4) return word.slice(0, -1);
+  return word;
+}
+
 function terms(value) {
-  return [...new Set(String(value || "").toLowerCase().match(/[a-z0-9]{3,}/g) || [])].filter(word => !STOP_WORDS.has(word));
+  return [...new Set((String(value || "").toLowerCase().match(/[a-z0-9]{3,}/g) || [])
+    .map(normalizeTerm))].filter(word => !STOP_WORDS.has(word));
 }
 
 function isAllowedDocumentUrl(url, baseUrl) {
@@ -65,13 +72,13 @@ async function readLimited(response, maxChars) {
   return text;
 }
 
-async function fetchIndex(source, fetchImpl) {
-  const cached = indexCache.get(source.indexUrl);
+async function fetchIndex(source, fetchImpl, useCache) {
+  const cached = useCache ? indexCache.get(source.indexUrl) : null;
   if (cached && cached.expiresAt > Date.now()) return cached.text;
   const response = await fetchImpl(source.indexUrl, { signal: AbortSignal.timeout(INDEX_TIMEOUT_MS) });
   if (!response.ok) throw new Error("Index returned HTTP " + response.status);
   const text = await readLimited(response, MAX_INDEX_CHARS);
-  indexCache.set(source.indexUrl, { text, expiresAt: Date.now() + INDEX_CACHE_TTL_MS });
+  if (useCache) indexCache.set(source.indexUrl, { text, expiresAt: Date.now() + INDEX_CACHE_TTL_MS });
   return text;
 }
 
@@ -89,7 +96,7 @@ export async function retrieveLegalSources(query, { fetchImpl = fetch, maxDocume
   const warnings = [];
   for (const source of RETRIEVABLE_LEGAL_SOURCES) {
     try {
-      const index = await fetchIndex(source, fetchImpl);
+      const index = await fetchIndex(source, fetchImpl, fetchImpl === fetch);
       const candidates = parseLegalIndex(index, source.baseUrl);
       const selected = rankLegalDocuments(candidates, query, maxDocuments);
       const docs = await Promise.all(selected.map(async item => {
