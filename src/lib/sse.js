@@ -1,6 +1,6 @@
 export async function consumeSSE(response,{onEvent,signal}={}){
  const type=response.headers.get("content-type")||"";
- if(!type.includes("text/event-stream")){let data={};try{data=await response.json()}catch{}throw new Error(data.error||"The service returned an unexpected response. Please try again.");}
+ if(!type.includes("text/event-stream")){let data={};try{data=await response.json()}catch{data={}}throw new Error(data.error||"The service returned an unexpected response. Please try again.");}
  if(!response.body)throw new Error("Streaming is not supported by this browser.");
  const reader=response.body.getReader(),decoder=new TextDecoder();let buffer="",event="message";
  try{
