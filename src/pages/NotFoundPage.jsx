@@ -7,7 +7,7 @@ export default function NotFoundPage() {
       <span className="eyebrow">404 · PAGE NOT FOUND</span>
       <h1>This page isn't<br /><em>in the papers.</em></h1>
       <p>The page you're looking for may have moved or may not exist.</p>
-      <Link className="back-link" to="/"><ArrowLeft size={16} /> Back to EllaLexi</Link>
+      <Link className="back-link" to="/"><ArrowLeft size={16} /> Back to EllaBrief</Link>
     </section>
   );
 }

@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import App from "./App.jsx";
 
-describe("EllaLexi application foundation", () => {
+describe("EllaBrief application foundation", () => {
   it("renders the product's primary message and responsible-use boundary", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -23,6 +23,6 @@ describe("EllaLexi application foundation", () => {
     );
 
     expect(screen.getByText(/404 · PAGE NOT FOUND/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /back to ellalexi/i })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: /back to ellabrief/i })).toHaveAttribute("href", "/");
   });
 });
