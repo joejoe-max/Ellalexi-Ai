@@ -108,7 +108,7 @@ export async function retrieveLegalSources(query, { fetchImpl = fetch, maxDocume
           return text ? {
             title: item.title, url: item.url, publisher: source.publisher,
             jurisdiction: source.jurisdiction, sourceName: source.name,
-            status: source.status, excerpt: text
+            status: source.status, publicationYear: (item.title.match(/\b(19|20)\d{2}\b/) || text.match(/\b(19|20)\d{2}\b/))?.[0] || null, excerpt: text
           } : null;
         } catch {
           return null;

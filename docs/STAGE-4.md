@@ -20,3 +20,13 @@ Only `GEMINI_API_KEY` is needed for AI analysis and legal-source comparison. Kee
 
 ## Upgrade path
 The `retrieveLegalSources` interface is isolated from the verification endpoint. It can later be replaced or extended with Gemini File Search or another retrieval backend without changing the analysis UI contract.
+
+
+## Citation requirements
+- Every legal finding displays a citation beside the proposition it supports.
+- Citation format: *Act or judgment title, year, specific section/subsection where verified, publisher, source link*.
+- The year is derived from the retrieved source title or text, never guessed from the current year.
+- A finding is displayed only when its source ID resolves to a retrieved source and a year can be identified.
+- If a numbered provision is claimed, that reference must also be found in the retrieved excerpt. Otherwise the finding is withheld rather than given an unsupported citation.
+- Citations link to the retrieved source; retrieved excerpts remain visible for inspection.
+- This conservative validation does not establish that a law remains in force. The historical repository remains non-authoritative for currentness and amendments.

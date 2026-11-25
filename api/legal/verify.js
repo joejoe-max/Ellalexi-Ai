@@ -41,9 +41,19 @@ export default async function handler(req,res) {
     if(!raw)return send(res,502,{error:"The legal-source service returned no result."});
     let result;try{result=JSON.parse(raw);}catch{return send(res,502,{error:"The legal-source service returned an unreadable result."});}
     if(!Array.isArray(result.findings)||!Array.isArray(result.limitations))return send(res,502,{error:"The legal-source result did not match the expected structure."});
-    const sources=retrieval.sources.map((source,index)=>({id:index+1,title:source.title,uri:source.url,publisher:source.publisher,jurisdiction:source.jurisdiction,status:source.status,excerpt:source.excerpt.slice(0,1800)}));
-    const allowed=new Set(sources.map(s=>s.id));
-    result.findings=result.findings.filter(f=>Array.isArray(f.sourceIds)&&f.sourceIds.length>0&&f.sourceIds.every(id=>allowed.has(id)));
+    const sources=retrieval.sources.map((source,index)=>({id:index+1,title:source.title,uri:source.url,publisher:source.publisher,jurisdiction:source.jurisdiction,status:source.status,year:source.publicationYear||null,excerpt:source.excerpt.slice(0,1800)}));
+    const sourceById=new Map(sources.map(s=>[s.id,s]));
+    result.findings=result.findings.flatMap(f=>{
+      if(!Array.isArray(f.sourceIds)||!f.sourceIds.length)return [];
+      const citations=f.sourceIds.map(id=>sourceById.get(id)).filter(Boolean).map(source=>{
+        const provision=String(f.provision||"").trim();
+        const sectionMatch=provision.match(/(?:section|s\.)\s*([0-9]+[A-Za-z]?(?:\([0-9A-Za-z]+\))*)/i);
+        const provisionVerified=sectionMatch && source.excerpt.toLowerCase().includes("section "+sectionMatch[1].toLowerCase());
+        if(!source.year||(sectionMatch&&!provisionVerified))return null;
+        return {sourceId:source.id,authority:source.title,year:source.year,provision:provisionVerified?provision:"Provision not independently located in retrieved excerpt",publisher:source.publisher,jurisdiction:source.jurisdiction,url:source.uri,provisionVerified,sourceStatus:source.status};
+      }).filter(Boolean);
+      return citations.length?[{...f,citations}]:[];
+    });
     if(!result.findings.length)result.status="insufficient_sources";
     result.limitations.push("The searchable federal-law index is historical and does not establish that a provision remains in force. Currentness and amendments require separate confirmation.");
     return send(res,200,{ok:true,model:MODEL,result,sources,sourceCatalog:retrieval.sourceCatalog,warnings:retrieval.warnings,notice:"Source-assisted legal information, not legal advice. Retrieved material may be historical, incomplete or inapplicable to a particular state."});
