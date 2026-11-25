@@ -20,7 +20,7 @@ describe("Gemini provider resilience",()=>{
   vi.stubGlobal("fetch",fetch);
   const fallback=vi.fn();
   const result=await generateWithFallback({systemInstruction:"system",parts:[{text:"hello"}],generationConfig:{},onFallback:fallback});
-  expect(result).toEqual({model:"second",text:"answer"});expect(fetch).toHaveBeenCalledTimes(2);expect(fallback).toHaveBeenCalledWith("second");
+  expect(result).toMatchObject({model:"second",text:"answer",payload:{candidates:[{content:{parts:[{text:"answer"}]}}]}});expect(fetch).toHaveBeenCalledTimes(2);expect(fallback).toHaveBeenCalledWith("second");
  });
  it("does not retry authentication failures",async()=>{
   vi.stubEnv("GEMINI_API_KEY","test-key");vi.stubEnv("GEMINI_MODELS","first,second");
