@@ -1,4 +1,4 @@
-import {describe,it,expect,vi} from "vitest";
+import {describe,it,expect} from "vitest";
 import {consumeSSE} from "./sse.js";
 function streamResponse(frames){const encoder=new TextEncoder();return new Response(new ReadableStream({start(controller){frames.forEach(frame=>controller.enqueue(encoder.encode(frame)));controller.close()}}),{headers:{"Content-Type":"text/event-stream"}})}
 describe("SSE client parser",()=>{
