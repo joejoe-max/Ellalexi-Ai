@@ -1,38 +1,24 @@
 # EllaLexi AI — MVP Architecture
 
-## Stage 1 foundation
+## Stage 1 — Foundation
+React + Vite + Tailwind CSS v4 (JavaScript), React Router, Vercel static frontend and Node serverless functions.
 
-- React + Vite frontend, written in JavaScript.
-- Tailwind CSS v4 through the Vite plugin.
-- Vercel serves the static frontend and Node.js serverless functions from the same repository.
-- React Router owns client-side navigation.
-- `/api/health` is a non-sensitive service health endpoint.
+## Stage 2 — Upload & document processing
+Browser sends multiple PDF/DOCX files as multipart form data to `POST /api/documents/extract`. Server validates method, multipart type, count, per-file/aggregate size and file signatures. PDF.js extracts selectable PDF text with page markers; Mammoth extracts DOCX text. Image-only PDFs are flagged as requiring OCR. Temporary files are deleted in a `finally` cleanup path. User documents are never added to the persistent legal retrieval index.
 
 ## Planned request path
+1. Upload and temporarily extract document text.
+2. Gemini 2.5 Flash produces structured, evidence-grounded analysis.
+3. Approved Nigerian legal materials are retrieved separately through Gemini File Search.
+4. Browser renders analysis, contextual questions and report.
+5. Temporary user-document data is discarded.
 
-1. The browser submits one or more supported documents to a Vercel API route.
-2. The server validates type, size and request limits before processing.
-3. Document contents are handled temporarily for the current analysis.
-4. Gemini 2.5 Flash produces a structured, evidence-grounded analysis.
-5. Approved Nigerian legal materials are retrieved separately through Gemini File Search.
-6. The browser renders the analysis workspace, contextual questions and report.
-7. Temporary user-document data is discarded according to the retention policy.
+## Data separation
+- User documents: request-scoped inputs; not persisted or added to the legal knowledge base.
+- Nigerian Legal Knowledge Base: separately curated legal materials with provenance, jurisdiction, legal status and version metadata.
+- Gemini File Search: managed retrieval/indexing service, not the legal corpus.
 
-## Separation of information
+## Security
+Never expose API keys through VITE variables. Do not log document text or personal data. Validate uploads server-side. Enforce limits. Do not persist user documents by default. Distinguish document text, verified law, inference and uncertainty.
 
-- **User documents:** private, request-scoped inputs; never added to the persistent legal knowledge base.
-- **Nigerian Legal Knowledge Base:** separately curated legal materials with provenance, jurisdiction, legal status, version and source metadata.
-- **Gemini File Search:** managed indexing and retrieval service for approved knowledge-base materials; it is not itself the legal corpus.
-
-## Security principles
-
-- Never expose provider API keys through `VITE_*` variables or browser bundles.
-- Do not log document text, extracted personal data or secrets.
-- Validate uploaded files on the server; browser validation is only a convenience.
-- Set explicit request and file-size limits before enabling public uploads.
-- Do not persist user documents by default.
-- Legal findings must distinguish document text, verified law, inference and uncertainty.
-
-## Stage boundary
-
-This stage establishes the frontend shell, design tokens, route handling, Vercel configuration, health endpoint and test tooling. Document upload, AI analysis and legal retrieval are deliberately not implemented until their respective stages.
+Stage 2 extracts text only; it does not interpret legal meaning.

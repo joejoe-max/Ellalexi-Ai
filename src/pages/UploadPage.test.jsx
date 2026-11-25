@@ -1,0 +1,4 @@
+import {describe,expect,it} from "vitest";
+import {validateFiles,MAX_FILE_BYTES,MAX_TOTAL_BYTES} from "../lib/uploadValidation.js";
+const f=(name,size=100)=>({name,size});
+describe("upload validation",()=>{it("requires a document",()=>expect(validateFiles([])).toMatch(/at least one/i));it("accepts PDF and DOCX",()=>expect(validateFiles([f("a.pdf"),f("b.docx")])).toBe(""));it("rejects unsupported files",()=>expect(validateFiles([f("a.png")])).toMatch(/not supported/i));it("limits each file to 10 MB",()=>expect(validateFiles([f("a.pdf",MAX_FILE_BYTES+1)])).toMatch(/10 MB/i));it("limits combined size to 25 MB",()=>expect(validateFiles([f("a.pdf",MAX_TOTAL_BYTES/2),f("b.docx",MAX_TOTAL_BYTES/2+1)])).toMatch(/25 MB/i));it("limits count to five",()=>expect(validateFiles(Array.from({length:6},(_,i)=>f(`${i}.pdf`)))).toMatch(/5 documents/i))})
