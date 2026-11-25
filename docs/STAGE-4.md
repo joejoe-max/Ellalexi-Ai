@@ -2,13 +2,13 @@
 
 ## Retrieval design
 Stage 4 uses two complementary sources:
-1. Live internet research: Gemini 2.5 Flash with Google Search grounding discovers relevant Nigerian legislation, amending Acts, regulations, official gazettes and judgments. EllaLexi then retrieves the actual page from eligible publishers. Search snippets alone are never legal evidence.
+1. Live internet research: Gemini 2.5 Flash with Google Search grounding discovers relevant Nigerian legislation, amending Acts, regulations, official gazettes and judgments. EllaBrief then retrieves the actual page from eligible publishers. Search snippets alone are never legal evidence.
 2. Local fallback: the configured historical Nigerian federal-law Markdown repository index is searched and retrieved as an additional source. It is explicitly labelled historical and is not treated as the current law.
 
 Live search runs alongside local retrieval. Retrieved sources are merged and passed to Gemini for comparison with the uploaded document.
 
 ## Source handling and citations
-- Google Search grounding metadata supplies candidate titles and URLs; EllaLexi does not accept URLs invented by the model.
+- Google Search grounding metadata supplies candidate titles and URLs; EllaBrief does not accept URLs invented by the model.
 - Live retrieval is restricted to HTTPS Nigerian government/court domains and selected legal information publishers to reduce SSRF risk. PDFs and unsupported content types are skipped rather than treated as retrieved text.
 - Each candidate page is fetched directly. Search snippets are not passed as source excerpts.
 - Publisher and authority class are derived from the final URL host allowlist.
