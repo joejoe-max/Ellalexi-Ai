@@ -1,4 +1,4 @@
-const clean=v=>String(v??"").replace(/[\u0000-\u001f\u007f]/g," ").trim();
+const clean=v=>String(v??"").replace(/\s+/g," ").trim();
 export async function downloadAnalysisReport({analysis={},documents=[],legalReview=null,checklist=[]}){
  const {jsPDF}=await import("jspdf");const doc=new jsPDF({unit:"mm",format:"a4"});let y=20;
  const add=(text)=>{const wrapped=doc.splitTextToSize(clean(text),174);for(const line of wrapped){if(y>278){doc.addPage();y=18}doc.text(line,18,y);y+=5.2}y+=2};
