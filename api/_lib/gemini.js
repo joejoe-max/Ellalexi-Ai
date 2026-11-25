@@ -11,18 +11,18 @@ export function classifyProviderError(status,payload={},cause){
  if(status===400)return {kind:"invalid_request",retry:false,httpStatus:422,message:"This request could not be processed. Check the uploaded content and try again."};
  return {kind:"provider_error",retry:false,httpStatus:502,message:"EllaLexi could not complete this request. Please try again."};
 }
-export async function generateWithFallback({parts,systemInstruction,generationConfig,timeout=90000,onFallback}){
+export async function generateWithFallback({parts,systemInstruction,generationConfig,tools,timeout=90000,onFallback,fetchImpl=fetch}){
  const key=process.env.GEMINI_API_KEY;
  if(!key)throw Object.assign(new Error("AI is not configured."),{kind:"configuration",httpStatus:503,userMessage:"EllaLexi's AI service is not configured yet. Please try again later."});
  const models=getModels();let last;
  for(let i=0;i<models.length;i++){
   const model=models[i];
   try{
-   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({systemInstruction:{parts:[{text:systemInstruction}]},contents:[{role:"user",parts}],generationConfig}),signal:AbortSignal.timeout(timeout)});
+   const response=await fetchImpl("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({systemInstruction:{parts:[{text:systemInstruction}]},contents:[{role:"user",parts}],generationConfig,...(tools?{tools}:{})}),signal:AbortSignal.timeout(timeout)});
    if(!response.ok){const payload=await response.json().catch(()=>({}));const err=classifyProviderError(response.status,payload);last=Object.assign(new Error(err.message),{...err,userMessage:err.message,model});if(!err.retry||i===models.length-1)break;onFallback?.(models[i+1]);continue;}
    const payload=await response.json();const text=payload.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("");
    if(!text)throw Object.assign(new Error("Empty model response"),{kind:"empty_response",retry:true,httpStatus:502,userMessage:"The AI service returned an incomplete response. Please try again."});
-   return {model,text};
+   return {model,text,payload};
   }catch(cause){const err=classifyProviderError(0,{},cause);last=Object.assign(new Error(err.message),{...err,model});if(!err.retry||i===models.length-1)break;onFallback?.(models[i+1]);}
  }
  throw last||Object.assign(new Error("AI unavailable"),{httpStatus:503,userMessage:"EllaLexi is temporarily unavailable. Please try again shortly."});
