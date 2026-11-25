@@ -4,7 +4,7 @@ describe("Gemini provider resilience",()=>{
  afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals()});
  it("uses supported Flash defaults and allows explicit model order",()=>{
   vi.stubEnv("GEMINI_MODELS","");
-  expect(getModels()).toEqual(["gemini-3.5-flash-lite","gemini-3.1-flash-lite"]);
+  expect(getModels()).toEqual(["gemini-3.8-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite"]);
   vi.stubEnv("GEMINI_MODELS","model-a, model-b,model-a");
   expect(getModels()).toEqual(["model-a","model-b"]);
  });
