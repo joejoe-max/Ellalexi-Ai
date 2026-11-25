@@ -1,6 +1,6 @@
 # Architecture
 
-EllaLexi is a document-grounded legal intelligence MVP. Uploaded documents are processed temporarily; no user account, persistent user-document store, embeddings database or Gemini File Search store is required for this stage.
+EllaBrief is a document-grounded legal intelligence MVP. Uploaded documents are processed temporarily; no user account, persistent user-document store, embeddings database or Gemini File Search store is required for this stage.
 
 ## Request flow
 1. React/Vite uploads PDF or DOCX to the Vercel API.
