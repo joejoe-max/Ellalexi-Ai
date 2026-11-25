@@ -18,7 +18,7 @@ export async function generateWithFallback({parts,systemInstruction,generationCo
  for(let i=0;i<models.length;i++){
   const model=models[i];
   try{
-   const response=await fetchImpl("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({systemInstruction:{parts:[{text:systemInstruction}]},contents:[{role:"user",parts}],generationConfig,...(tools?{tools}:{})}),signal:AbortSignal.timeout(timeout)});
+   const response=await fetchImpl("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({...(systemInstruction?{systemInstruction:{parts:[{text:systemInstruction}]}}:{}),contents:[{role:"user",parts}],generationConfig,...(tools?{tools}:{})}),signal:AbortSignal.timeout(timeout)});
    if(!response.ok){const payload=await response.json().catch(()=>({}));const err=classifyProviderError(response.status,payload);last=Object.assign(new Error(err.message),{...err,userMessage:err.message,model});if(!err.retry||i===models.length-1)break;onFallback?.(models[i+1]);continue;}
    const payload=await response.json();const text=payload.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("");
    if(!text&&!allowEmptyText)throw Object.assign(new Error("Empty model response"),{kind:"empty_response",retry:true,httpStatus:502,userMessage:"The AI service returned an incomplete response. Please try again."});
