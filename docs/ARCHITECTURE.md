@@ -5,11 +5,17 @@ EllaLexi is a document-grounded legal intelligence MVP. Uploaded documents are p
 ## Request flow
 1. React/Vite uploads PDF or DOCX to the Vercel API.
 2. Server-side extraction and Gemini 2.5 Flash produce structured document analysis.
-3. POST /api/legal/verify performs live Nigerian legal web discovery through Gemini Google Search grounding and retrieves actual eligible source pages.
-4. In parallel, the historical local Nigerian federal-law index is searched as an additional source.
-5. Retrieved excerpts and metadata are passed to Gemini for comparison.
-6. The API validates source IDs, year metadata and numbered provision references before returning findings and inline citation metadata.
-7. The browser displays document analysis and legal-source review with citations beside findings.
+3. The active analysis workspace presents a plain-English overview, document inventory, clauses, rights/obligations, risks, money terms, missing protections, questions, cross-document findings and limitations.
+4. `POST /api/legal/verify` performs live Nigerian legal web discovery through Gemini Google Search grounding and retrieves actual eligible source pages.
+5. In parallel, the historical local Nigerian federal-law index is searched as an additional source.
+6. Retrieved excerpts and metadata are passed to Gemini for comparison.
+7. The browser displays source-assisted legal findings with citations beside each finding.
+
+## Workspace
+- Navigation is contextual to the active analysis and only links to populated sections.
+- Document quotations retain their source document/page and code-checked quote status.
+- Empty categories are omitted; no arbitrary risk score is displayed.
+- Questions and limitations remain part of the current analysis, not separate global destinations.
 
 ## Safety boundaries
 - API keys stay server-side.
