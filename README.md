@@ -1,4 +1,4 @@
-# EllaLexi AI
+# EllaBrief
 
 **Understand Before You Agree.**
 
