@@ -4,7 +4,6 @@ import { fileTypeFromBuffer } from "file-type";
 import mammoth from "mammoth";
 export const config = { api: { bodyParser: false } };
 const MAX_FILE=10*1024*1024, MAX_TOTAL=25*1024*1024, MAX_FILES=5, MAX_PAGES=150, MAX_TEXT=120000;
-const ALLOWED=new Set(["application/pdf","application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
 const send=(res,status,data)=>{res.setHeader("Cache-Control","no-store, private");res.setHeader("X-Content-Type-Options","nosniff");return res.status(status).json(data)};
 function parse(req){const form=formidable({multiples:true,maxFiles:MAX_FILES,maxFileSize:MAX_FILE,maxTotalFileSize:MAX_TOTAL,allowEmptyFiles:false,minFileSize:1,keepExtensions:true});return new Promise((resolve,reject)=>form.parse(req,(e,fields,files)=>e?reject(e):resolve(files)))}
 async function pdfText(buffer){const pdfjs=await import("pdfjs-dist/legacy/build/pdf.mjs");const task=pdfjs.getDocument({data:new Uint8Array(buffer),isEvalSupported:false,useSystemFonts:true});const pdf=await task.promise;if(pdf.numPages>MAX_PAGES){await pdf.destroy();throw new Error(`PDF exceeds the ${MAX_PAGES}-page limit.`)}const pages=[];for(let n=1;n<=pdf.numPages;n++){const page=await pdf.getPage(n);const content=await page.getTextContent();pages.push(`[Page ${n}]\n${content.items.map(x=>typeof x.str==="string"?x.str:"").join(" ").replace(/\s+/g," ").trim()}`)}await pdf.destroy();const text=pages.join("\n\n");return {text:text.slice(0,MAX_TEXT),pageCount:pages.length,truncated:text.length>MAX_TEXT}}
