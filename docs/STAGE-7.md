@@ -1,6 +1,6 @@
 # Stage 7 — Resilient AI requests and SSE
 
-- Central Gemini model order is configured by server-only `GEMINI_MODELS` (comma-separated). Defaults are `gemini-3.5-flash-lite,gemini-3.1-flash-lite`, based on Google's currently listed Gemini API model catalogue.
+- Central Gemini model order is configured by server-only `GEMINI_MODELS` (comma-separated). Defaults are `gemini-3.8-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite`, based on Google's currently listed Gemini API model catalogue.
 - Quota/rate-limit, transient server, timeout and unavailable-model failures can fail over. Authentication/permission and invalid-request failures stop immediately.
 - Provider error text and credentials are never sent to the browser. User-facing errors are mapped to safe messages.
 - `POST /api/documents/analyze`, `POST /api/documents/ask`, and `POST /api/legal/verify` use SSE: `status`, `fallback`, `delta`, `complete`, and `error`. Upload and JSON POST requests use fetch + ReadableStream parsing; native EventSource cannot submit FormData or JSON POST bodies.
