@@ -22,3 +22,5 @@ Browser sends multiple PDF/DOCX files as multipart form data to `POST /api/docum
 Never expose API keys through VITE variables. Do not log document text or personal data. Validate uploads server-side. Enforce limits. Do not persist user documents by default. Distinguish document text, verified law, inference and uncertainty.
 
 Stage 2 extracts text only; it does not interpret legal meaning.
+## Stage 3 — AI analysis
+The browser posts uploaded files directly to `POST /api/documents/analyze`. The Node function extracts text, passes extracted content and scanned PDF bytes to Gemini 2.5 Flash, validates the structured response, checks quoted passages against extracted text, and returns the analysis. API keys remain server-side. User documents are not stored or added to File Search. This stage explains document contents only; current Nigerian law verification is reserved for Stage 4.
