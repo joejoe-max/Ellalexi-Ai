@@ -54,7 +54,7 @@ export async function searchLiveLegalSources(query, { apiKey, fetchImpl = fetch 
     "Issue: " + String(query).slice(0, 8500)
   ].join("\n");
   try {
-    const generated = await generateWithFallback({parts:[{text:prompt}],generationConfig:{temperature:0.1,maxOutputTokens:1800},tools:[{google_search:{}}],timeout:25000,fetchImpl});
+    const generated = await generateWithFallback({parts:[{text:prompt}],generationConfig:{temperature:0.1,maxOutputTokens:1800},tools:[{google_search:{}}],timeout:25000,fetchImpl,allowEmptyText:true});
     const payload=generated.payload;
     const candidates = normalizeGroundingChunks(payload.candidates?.[0]?.groundingMetadata?.groundingChunks || []);
     const sources = (await Promise.all(candidates.map(async candidate => {
