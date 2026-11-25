@@ -23,7 +23,7 @@ export async function generateWithFallback({parts,systemInstruction,generationCo
    const payload=await response.json();const text=payload.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("");
    if(!text&&!allowEmptyText)throw Object.assign(new Error("Empty model response"),{kind:"empty_response",retry:true,httpStatus:502,userMessage:"The AI service returned an incomplete response. Please try again."});
    return {model,text,payload};
-  }catch(cause){const err=classifyProviderError(0,{},cause);last=Object.assign(new Error(err.message),{...err,model});if(!err.retry||i===models.length-1)break;onFallback?.(models[i+1]);}
+  }catch(cause){const classified=classifyProviderError(0,{},cause);const err=cause?.retry?{...classified,kind:cause.kind||"invalid_response",retry:true,message:cause.userMessage||"The AI service returned an incomplete response. Please try again."}:classified;last=Object.assign(new Error(err.message),{...err,userMessage:err.message,model});if(!err.retry||i===models.length-1)break;onFallback?.(models[i+1]);}
  }
  throw last||Object.assign(new Error("AI unavailable"),{httpStatus:503,userMessage:"EllaLexi is temporarily unavailable. Please try again shortly."});
 }
