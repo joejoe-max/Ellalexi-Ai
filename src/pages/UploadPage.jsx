@@ -17,7 +17,7 @@ function Evidence({item}){
     <small>{item.documentName}{item.page&&item.page!=="not available"?` · Page ${item.page}`:""}</small>
     {verified&&<p className="evidence-ok">Matched against the document text.</p>}
 
-    {!verified&&!imageRead&&item.evidenceStatus==="not_located"&&<p>Could not automatically re-find this passage in the extracted text. Compare with the original document.</p>}
+    {!verified&&item.evidenceStatus==="not_located"&&<p>Could not automatically re-find this passage in the extracted text. Compare with the original document.</p>}
   </div>;
 }
 
