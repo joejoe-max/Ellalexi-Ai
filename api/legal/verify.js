@@ -142,7 +142,7 @@ export default async function handler(req, res) {
     documentOverview: String(analysis.documentOverview || "").slice(0, 3000),
     executiveSummary: String(analysis.executiveSummary || "").slice(0, 3000),
     clauses: Array.isArray(analysis.clauses)
-      ? analysis.clauses.slice(0, 15).map(({ heading, plainMeaning, quote, documentName, page, benefits, burdens, terminology }) =>
+      ? analysis.clauses.slice(0, 15).map(({ heading, plainMeaning, quote, documentName, page, benefits, burdens: _burdens, terminology }) =>
         ({ heading, plainMeaning, quote, documentName, page, benefits, terminology }))
       : [],
     risks: Array.isArray(analysis.risks)
