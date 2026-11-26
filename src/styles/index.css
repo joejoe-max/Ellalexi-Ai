@@ -194,3 +194,15 @@ h1 em, h2 em { color: var(--olive); font-family: "Newsreader", serif; font-weigh
 .markdown-message th,.markdown-message td{padding:8px 10px;border:1px solid var(--line);text-align:left;vertical-align:top}
 .markdown-message th{background:#292a23;color:#e5e5d9;font-weight:600}
 .markdown-message td{color:#bdbeb2}
+
+
+/* Clause-level plain-English explanations */
+.clause-explanation{margin-top:12px}
+.clause-explanation>b,.clause-terms>b{display:block;margin:13px 0 5px;color:#e4e4da;font-size:11px;font-weight:700}
+.clause-explanation>p{margin:5px 0 10px;color:#bdbeb2;font-size:12px;line-height:1.8}
+.clause-explanation ul{margin:5px 0 12px;padding-left:20px;color:#bdbeb2;font-size:11px;line-height:1.75}
+.clause-explanation li{margin:4px 0;padding-left:3px}
+.clause-terms{margin-top:13px;padding:12px;border-left:2px solid var(--olive);background:#20211d}
+.clause-terms>b{margin-top:0}
+.clause-terms p{margin:9px 0;color:#d2d2c6;font-size:11px;line-height:1.7}
+.clause-terms p span{display:block;margin-top:3px;color:#9fa094}
