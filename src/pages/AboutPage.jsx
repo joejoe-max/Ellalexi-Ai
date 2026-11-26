@@ -7,7 +7,8 @@ const initiatives=[
  {number:"03",icon:HeartHandshake,title:"Love & The Law",tag:"CONSENT & AWARENESS",text:"A weekly series exploring love and consent through the lens of the law — making important conversations easier for students to approach."},
  {number:"04",icon:FileCheck2,title:"Centralised oath-taking",tag:"STUDENT SERVICES",text:"Her 100-day report highlighted the centralisation of oath-taking and mass swearing-in ceremonies to make the process more organised."},
  {number:"05",icon:Users,title:"Student support",tag:"WELFARE",text:"The report also recorded the distribution of asthma relief supplies, sanitary pads and stationery to students."},
- {number:"06",icon:VolumeX,title:"The “No Noise” policy",tag:"CAMPUS CULTURE",text:"A policy initiative listed in her first-100-days report, reflecting an effort to promote order and responsibility within the student community."}
+ {number:"06",icon:VolumeX,title:"The “No Noise” policy",tag:"CAMPUS CULTURE",text:"A policy initiative listed in her first-100-days report, reflecting an effort to promote order and responsibility within the student community."},
+ {number:"07",icon:Users,title:"Faculty legal liaison network",tag:"ACCESS TO JUSTICE",text:"At a June 2026 town hall, the office decorated Faculty Liaison Officers with identification tags, establishing them as first points of contact for students with legal concerns in their faculties."}
 ];
 
 export default function AboutPage(){return <main className="about-page section-wrap">
@@ -43,7 +44,13 @@ export default function AboutPage(){return <main className="about-page section-w
   </div>
   <div className="meet-work-heading"><div><div className="about-kicker">03 / WORK & INITIATIVES</div><h3>Service, beyond the title.</h3></div><p>A look at initiatives attributed to her office during the 2025/26 session.</p></div>
   <div className="meet-work">{initiatives.map(item=>{const Icon=item.icon;return <article className="meet-work-card" key={item.number}><div className="meet-card-top"><span>{item.number}</span><Icon size={20} strokeWidth={1.6}/></div><div className="meet-card-tag">{item.tag}</div><h4>{item.title}</h4><p>{item.text}</p></article>})}</div>
-  <div className="meet-source-note">The initiatives above are summarised from the 100-day report and campaign information supplied for this profile. Public search also surfaced a campaign post by Shield the Child Foundation describing its collaboration with the Office of the Attorney General and the Akwa Ibom State GBV Management Committee.</div>
+  <div className="meet-beyond">
+  <div className="about-kicker">BEYOND THE ATTORNEY GENERAL'S OFFICE</div>
+  <h3>Continuing the work.</h3>
+  <p>In a public LinkedIn post, Itoro Gabriel wrote about speaking on “The Silent Struggles: When Young People Suffer in Silence” on 28 August 2026. The post also announced her appointment as Community Manager of the We4Us Project. These are later activities, separate from her SUG tenure.</p>
+ </div>
+ <div className="meet-social-links"><span>PUBLIC PROFILES</span><a href="https://www.facebook.com/profile.php?id=61582406414692" target="_blank" rel="noreferrer">Facebook <ArrowUpRight size={13}/></a><a href="https://ng.linkedin.com/in/itoro-gabriel-4b5623252" target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={13}/></a></div>
+ <div className="meet-source-note">Profile details and initiative summaries are based on information supplied for this page and publicly indexed posts from the LinkedIn profile linked above. The Facebook profile link was supplied directly; Facebook did not expose its contents to this research session, so no additional claims have been attributed to it.</div>
  </section>
  <section className="about-closing"><div><div className="about-kicker">THE IDEA CONTINUES</div><h2>Understand the document.<br/><em>Then decide with clarity.</em></h2><p>Whatever the opportunity, know what the words mean before you put your name to them.</p></div><Link className="about-cta" to="/upload">Review a document <ArrowUpRight size={16}/></Link></section>
  </main>}
