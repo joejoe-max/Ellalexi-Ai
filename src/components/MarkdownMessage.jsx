@@ -32,6 +32,15 @@ function isTableDivider(line) {
 function cells(line) {
   return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(cell => cell.trim());
 }
+function columnAlignments(line) {
+  return cells(line).map(cell => {
+    const left = cell.startsWith(":");
+    const right = cell.endsWith(":");
+    if (left && right) return "center";
+    if (right) return "right";
+    return "left";
+  });
+}
 
 export default function MarkdownMessage({ content = "" }) {
   const lines = String(content).replace(/\r\n?/g, "\n").split("\n");
@@ -64,10 +73,11 @@ export default function MarkdownMessage({ content = "" }) {
 
     if (i + 1 < lines.length && line.includes("|") && isTableDivider(lines[i + 1])) {
       const headers = cells(line);
+      const alignments = columnAlignments(lines[i + 1]);
       i += 2;
       const rows = [];
       while (i < lines.length && lines[i].includes("|") && lines[i].trim()) rows.push(cells(lines[i++]));
-      blocks.push(<div className="markdown-table-wrap" key={blocks.length}><table><thead><tr>{headers.map((cell, n) => <th key={n}>{renderInline(cell)}</th>)}</tr></thead><tbody>{rows.map((row, n) => <tr key={n}>{headers.map((_, c) => <td key={c}>{renderInline(row[c] || "")}</td>)}</tr>)}</tbody></table></div>);
+      blocks.push(<div className="markdown-table-wrap" key={blocks.length}><table><thead><tr>{headers.map((cell, n) => <th key={n} style={{ textAlign: alignments[n] || "left" }}>{renderInline(cell)}</th>)}</tr></thead><tbody>{rows.map((row, n) => <tr key={n}>{headers.map((_, c) => <td key={c} style={{ textAlign: alignments[c] || "left" }}>{renderInline(row[c] || "")}</td>)}</tr>)}</tbody></table></div>);
       continue;
     }
 
