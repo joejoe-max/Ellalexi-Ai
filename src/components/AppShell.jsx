@@ -11,6 +11,7 @@ export default function AppShell({ children }) {
         </Link>
 
         <nav className="header-nav" aria-label="Main navigation">
+          <Link to="/about">About</Link>
           <a href="#how-it-works">How it works</a>
           <a href="#our-approach">Our approach</a>
         </nav>
