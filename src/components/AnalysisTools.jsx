@@ -5,7 +5,7 @@ import {downloadAnalysisReport} from "../lib/pdfReport.js";
 import {consumeSSE} from "../lib/sse.js";
 import MarkdownMessage from "./MarkdownMessage.jsx";
 
-const ASK_TIMEOUT_MS = 75000;
+const ASK_TIMEOUT_MS = 90000;\n\nfunction questionNeedsSource(question){\n return /\\b(clause|section|article|paragraph|page|quote|quotation|exact wording|word.?for.?word|verbatim|where (?:does|is)|what (?:does|do) .{0,35} say|in the (?:original )?document|according to (?:the )?(?:document|agreement)|wording of|text of)\\b/i.test(question);\n}
 
 export default function AnalysisTools({analysis,documents,legalReview,files=[]}){
  const [question,setQuestion]=useState("");const [answer,setAnswer]=useState(null);const [streamingAnswer,setStreamingAnswer]=useState("");const [asking,setAsking]=useState(false);const [askError,setAskError]=useState("");
@@ -25,7 +25,7 @@ export default function AnalysisTools({analysis,documents,legalReview,files=[]})
    body.append("question",question.trim());
    body.append("analysis",JSON.stringify(analysis));
    body.append("legalReview",JSON.stringify(legalReview||null));
-   files.forEach(file=>body.append("documents",file));
+   // Avoid re-uploading and re-reading large source files for ordinary questions.\n   // Attach originals only when the question asks for exact source wording/location.\n   if(questionNeedsSource(question.trim()))files.forEach(file=>body.append("documents",file));
    const r=await fetch("/api/documents/ask",{method:"POST",body,signal:controller.signal});
    if(!r.ok)throw new Error("Follow-up unavailable. Please try again.");
    let receivedComplete=false;
@@ -37,7 +37,7 @@ export default function AnalysisTools({analysis,documents,legalReview,files=[]})
      if(event==="fallback")setStreamingAnswer("");
     }
    });
-   if(!receivedComplete && !streamingAnswer){
+   if(!receivedComplete){
     throw new Error("The assistant did not return a complete answer. Please try again.");
    }
   }catch(err){
@@ -57,7 +57,7 @@ export default function AnalysisTools({analysis,documents,legalReview,files=[]})
 
  return <div className="analysis-tools">
  <section className="analysis-tool-panel" id="before-you-sign"><div className="eyebrow"><ClipboardCheck size={14}/> BEFORE YOU SIGN</div><h3>Points to resolve or discuss</h3><p className="tool-intro">A working checklist generated from this review. It is not legal clearance or a recommendation to sign.</p>{checklist.length?<div className="checklist-items">{checklist.map(x=><article className="checklist-item" key={x.id}><span className="checklist-marker"/><div><small>{x.category}</small><b>{x.title}</b><p>{x.detail}</p>{x.source&&<small>{x.source}</small>}</div></article>)}</div>:<p>No specific checklist items were generated. Review the original documents and raise anything unclear with a qualified practitioner.</p>}</section>
- <section className="analysis-tool-panel" id="ask-ellabrief"><div className="eyebrow"><MessageCircle size={14}/> ASK ABOUT THIS ANALYSIS</div><h3>Need something explained?</h3><p className="tool-intro">Ask about the review or the original wording. EllaBrief will check the saved source files when available.</p><form className="analysis-ask-form" onSubmit={ask}><label htmlFor="analysis-question">Your question</label><textarea id="analysis-question" rows="3" maxLength="1200" value={question} onChange={e=>setQuestion(e.target.value)} placeholder="For example: What does the indemnity clause mean for me?" disabled={asking}/><div className="ask-form-footer"><small>{question.length}/1,200</small><button type="submit" disabled={!question.trim()||asking}>{asking?<LoaderCircle className="spin" size={15}/>:<Send size={15}/>} Ask EllaBrief</button></div></form>{askError&&<p className="ask-error" role="alert">{askError}</p>}{(answer||streamingAnswer)&&<article className="ask-answer" aria-live="polite"><b>EllaBrief response</b><MarkdownMessage content={answer?.answer||streamingAnswer}/></article>}</section>
+ <section className="analysis-tool-panel" id="ask-ellabrief"><div className="eyebrow"><MessageCircle size={14}/> ASK ABOUT THIS ANALYSIS</div><h3>Need something explained?</h3><p className="tool-intro">Ask about the review. EllaBrief streams its answer as it is generated and checks original files when your question needs exact wording or a page reference.</p><form className="analysis-ask-form" onSubmit={ask}><label htmlFor="analysis-question">Your question</label><textarea id="analysis-question" rows="3" maxLength="1200" value={question} onChange={e=>setQuestion(e.target.value)} placeholder="For example: What does the indemnity clause mean for me?" disabled={asking}/><div className="ask-form-footer"><small>{question.length}/1,200</small><button type="submit" disabled={!question.trim()||asking}>{asking?<LoaderCircle className="spin" size={15}/>:<Send size={15}/>} Ask EllaBrief</button></div></form>{askError&&<p className="ask-error" role="alert">{askError}</p>}{(answer||streamingAnswer)&&<article className="ask-answer" aria-live="polite"><b>EllaBrief response</b><MarkdownMessage content={answer?.answer||streamingAnswer}/></article>}</section>
  <section className="analysis-tool-panel report-tool"><div><div className="eyebrow"><Download size={14}/> YOUR DOCUMENT REPORT</div><h3>Keep a copy of this review</h3><p className="tool-intro">Download a PDF containing the analysis, checklist and available legal-source citations.</p></div><button type="button" className="report-download" onClick={()=>downloadAnalysisReport({analysis,documents,legalReview,checklist})}><Download size={16}/> Download PDF report</button></section>
  </div>
 }
