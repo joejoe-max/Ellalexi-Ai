@@ -91,7 +91,7 @@ async function generatePrinciplesGuidance(compact, docType, onFallback) {
       text: "Provide general Nigerian legal-principle guidance for this " + docType + ". Tie each finding to issues in the analysis. Do not invent section numbers.\n\n" + input
     }],
     generationConfig: { temperature: 0.25, maxOutputTokens: 5000, responseMimeType: "application/json", responseSchema: SCHEMA },
-    timeout: 75000,
+    timeout: 35000,
     onFallback
   });
   let result;
@@ -119,6 +119,8 @@ async function generatePrinciplesGuidance(compact, docType, onFallback) {
   result.unresolvedQuestions = Array.isArray(result.unresolvedQuestions) ? result.unresolvedQuestions : [];
   return { result, model: generated.model };
 }
+
+export const config = { maxDuration: 60 };
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -213,15 +215,29 @@ export default async function handler(req, res) {
         text: "Compare the document issues with the retrieved Nigerian legal source excerpts. The document appears to be a " + docType + ". Use sourceIds exactly as supplied.\n\n" + input
       }],
       generationConfig: { temperature: 0.1, maxOutputTokens: 6000, responseMimeType: "application/json", responseSchema: SCHEMA },
-      timeout: 90000,
+      timeout: 45000,
       onFallback: () => sendEvent(res, "fallback", { message: "Trying another AI model…" })
     });
 
     let result;
-    try { result = JSON.parse(generated.text); }
-    catch { return send(res, 502, { error: "The legal-source service returned an unreadable result." }); }
-    if (!Array.isArray(result.findings) || !Array.isArray(result.limitations)) {
-      return send(res, 502, { error: "The legal-source result did not match the expected structure." });
+    try {
+      result = JSON.parse(String(generated.text || "").trim().replace(/^\x60\x60\x60(?:json)?\s*/i, "").replace(/\s*\x60\x60\x60$/, ""));
+      if (result?.result && typeof result.result === "object" && !Array.isArray(result.result)) result = result.result;
+      if (result?.analysis && typeof result.analysis === "object" && !Array.isArray(result.analysis)) result = result.analysis;
+    } catch {
+      return send(res, 502, { error: "The legal-source service returned an unreadable result." });
+    }
+    // Models occasionally omit optional arrays or wrap the object. Normalise
+    // those harmless shape variations, but never fabricate legal findings.
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
+      return send(res, 502, { error: "The legal-source service returned an invalid result." });
+    }
+    result.findings = Array.isArray(result.findings) ? result.findings : [];
+    result.limitations = Array.isArray(result.limitations) ? result.limitations : [];
+    result.unresolvedQuestions = Array.isArray(result.unresolvedQuestions) ? result.unresolvedQuestions : [];
+    result.summary = typeof result.summary === "string" ? result.summary : "Legal source review completed with limited structured findings.";
+    if (!["verified_sources_found", "insufficient_sources", "conflicting_sources", "general_principles"].includes(result.status)) {
+      result.status = result.findings.length ? "verified_sources_found" : "insufficient_sources";
     }
 
     const sources = combined.map((source, index) => ({
