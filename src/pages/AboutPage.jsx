@@ -35,7 +35,7 @@ export default function AboutPage(){return <main className="about-page section-w
  <section className="meet-section">
   <div className="meet-heading"><div className="about-kicker">02 / THE NAME BEHIND THE INSPIRATION</div><h2>Meet Ella.</h2><p>The person whose work helped give this project its name and human connection.</p></div>
   <div className="meet-profile">
-   <div className="meet-photo-column"><div className="meet-photo-wrap"><img className="meet-photo" src="/ella-itoro-gabby.jpg" alt="Portrait of Ella Itoro Gabby" loading="lazy"/><div className="meet-photo-overlay">ELLA ITORO GABBY</div></div><div className="meet-photo-caption">STUDENT LEADERSHIP · LEGAL EDUCATION · SERVICE</div></div>
+   <div className="meet-photo-column"><div className="meet-photo-wrap"><img className="meet-photo" src="/FB_IMG_17956838197394767.jpg" alt="Portrait of Ella Itoro Gabby" loading="lazy"/><div className="meet-photo-overlay">ELLA ITORO GABBY</div></div><div className="meet-photo-caption">STUDENT LEADERSHIP · LEGAL EDUCATION · SERVICE</div></div>
    <div className="meet-copy"><div className="meet-name-line"><div><h3>Ella Itoro Gabby</h3><p className="meet-role">Former Attorney General · Students’ Union Government, University of Uyo · 2025/26 session</p></div><div className="meet-monogram">EG</div></div>
     <p>During her tenure as Attorney General, Ella’s office highlighted legal education, student welfare and awareness of rights and responsibilities. She was sworn into office on 25 November 2025, and her tenure carried the slogan <strong>“We LISTEN to Judge.”</strong></p>
     <p>Her work brought legal conversations beyond formal settings and into the everyday experiences of students — from consent and campus safety to practical student services.</p>
