@@ -47,7 +47,8 @@ export async function searchLiveLegalSources(query, { apiKey, fetchImpl = fetch 
   if (!apiKey) return { sources: [], warnings: ["Live legal search is not configured because GEMINI_API_KEY is missing."], searched: false };
   const prompt = [
     "Search the live public internet for Nigerian legal materials relevant to the issue below.",
-    "Prioritise actual Acts, amending Acts, regulations, official gazettes and court judgments hosted by Nigerian government or court sources.",
+    "First identify the type of legal document or relationship involved (for example tenancy/lease, employment, shareholders agreement, loan, NDA, sale of goods).",
+    "Then prioritise actual Acts, amending Acts, regulations, official gazettes and court judgments hosted by Nigerian government or court sources that govern that type of document.",
     "Search for later amendments, repeal, commencement, effective dates and current legal status of any principal Act.",
     "Distinguish enacted laws from bills, proposals, policy announcements and news. A newer upload or news report does not prove that an amendment commenced.",
     "Return relevant primary-source pages. Search snippets are not legal evidence.",
@@ -76,8 +77,18 @@ export async function searchLiveLegalSources(query, { apiKey, fetchImpl = fetch 
           publicationYear: extractYear(candidate.title, excerpt), excerpt, retrieval: "google_search_grounding" };
       } catch { return null; }
     }))).filter(Boolean);
-    return { sources, searched: true, warnings: sources.length ? [] : ["Live search ran, but no eligible legal source page could be retrieved in full. Search-result snippets were not used as legal evidence."] };
+    return {
+      sources,
+      searched: true,
+      warnings: sources.length
+        ? []
+        : ["Live search ran, but no eligible legal source page could be retrieved in full. Search-result snippets were not used as legal evidence."]
+    };
   } catch {
-    return { sources: [], searched: false, warnings: ["Live legal search could not be completed. The local source index was also checked where available."] };
+    return {
+      sources: [],
+      searched: false,
+      warnings: ["Live legal search could not be completed for this review."]
+    };
   }
 }
