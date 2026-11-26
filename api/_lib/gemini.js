@@ -36,8 +36,8 @@ export async function generateWithFallback({parts,systemInstruction,generationCo
 }
 
 
-// Stream generated text as soon as Gemini emits it. A model fallback is safe only
-// before the first text chunk; once text is visible we never mix model responses.
+// Stream Gemini output to the client as it is generated. Fail over only before
+// any text has been emitted so answers from different models are never mixed.
 export async function streamWithFallback({parts,systemInstruction,generationConfig,timeout=65000,onToken,onFallback,fetchImpl=fetch,apiKey:suppliedApiKey}){
  const key=suppliedApiKey||process.env.GEMINI_API_KEY;
  if(!key)throw Object.assign(new Error("AI is not configured."),{kind:"configuration",httpStatus:503,userMessage:"EllaBrief's AI service is not configured yet. Please try again later."});
@@ -49,9 +49,9 @@ export async function streamWithFallback({parts,systemInstruction,generationConf
    const response=await fetchImpl(url,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({...(systemInstruction?{systemInstruction:{parts:[{text:systemInstruction}]}}:{}),contents:[{role:"user",parts}],generationConfig}),signal:AbortSignal.timeout(timeout)});
    if(!response.ok){const payload=await response.json().catch(()=>({}));const classified=classifyProviderError(response.status,payload);last=Object.assign(new Error(classified.message),{...classified,userMessage:classified.message,model,providerStatus:response.status});if(!classified.retry||i===models.length-1)break;onFallback?.(models[i+1]);continue;}
    if(!response.body)throw Object.assign(new Error("Gemini returned no stream."),{kind:"provider_error",retry:true,httpStatus:503,userMessage:"The AI service returned an incomplete response. Please try again."});
-   const reader=response.body.getReader(),decoder=new TextDecoder();let buffer="",eventData=[];
-   const consumeFrame=async frame=>{
-    for(const line of frame.replace(/\\r/g,"").split("\\n")){
+   const reader=response.body.getReader(),decoder=new TextDecoder();let buffer="";
+   const consumeFrame=frame=>{
+    for(const line of frame.replace(/\r/g,"").split("\n")){
      if(!line.startsWith("data:"))continue;
      const raw=line.slice(5).trim();if(!raw||raw==="[DONE]")continue;
      let payload;try{payload=JSON.parse(raw)}catch{continue;}
@@ -61,16 +61,15 @@ export async function streamWithFallback({parts,systemInstruction,generationConf
    };
    try{
     while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;
-     while((boundary=buffer.indexOf("\\n\\n"))>=0){const frame=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);await consumeFrame(frame);}
+     while((boundary=buffer.indexOf("\n\n"))>=0){consumeFrame(buffer.slice(0,boundary));buffer=buffer.slice(boundary+2);}
     }
-    if(buffer.trim())await consumeFrame(buffer);
+    if(buffer.trim())consumeFrame(buffer);
    }finally{reader.releaseLock();}
    if(!emitted.trim())throw Object.assign(new Error("Empty model response"),{kind:"empty_response",retry:true,httpStatus:502,userMessage:"The AI service returned an empty response. Please try again."});
    return {model,text:emitted};
   }catch(cause){
-   if(emitted){throw Object.assign(new Error("The response stream ended unexpectedly."),{kind:"stream_interrupted",httpStatus:502,userMessage:"The response was interrupted. Please ask again; no partial answer was saved."});}
-   const classified=classifyProviderError(0,{},cause);
-   const retry=cause?.retry??classified.retry;
+   if(emitted)throw Object.assign(new Error("The response stream ended unexpectedly."),{kind:"stream_interrupted",httpStatus:502,userMessage:"The response was interrupted. Please ask again; no partial answer was saved."});
+   const classified=classifyProviderError(0,{},cause),retry=cause?.retry??classified.retry;
    last=Object.assign(new Error(cause.userMessage||classified.message),{...classified,kind:cause.kind||classified.kind,retry,userMessage:cause.userMessage||classified.message,model});
    if(!retry||i===models.length-1)break;
    onFallback?.(models[i+1]);
