@@ -5,7 +5,11 @@ import {downloadAnalysisReport} from "../lib/pdfReport.js";
 import {consumeSSE} from "../lib/sse.js";
 import MarkdownMessage from "./MarkdownMessage.jsx";
 
-const ASK_TIMEOUT_MS = 90000;\n\nfunction questionNeedsSource(question){\n return /\\b(clause|section|article|paragraph|page|quote|quotation|exact wording|word.?for.?word|verbatim|where (?:does|is)|what (?:does|do) .{0,35} say|in the (?:original )?document|according to (?:the )?(?:document|agreement)|wording of|text of)\\b/i.test(question);\n}
+const ASK_TIMEOUT_MS = 90000;
+
+function questionNeedsSource(question){
+ return /\b(clause|section|article|paragraph|page|quote|quotation|exact wording|word.?for.?word|verbatim|where (?:does|is)|what (?:does|do) .{0,35} say|in the (?:original )?document|according to (?:the )?(?:document|agreement)|wording of|text of)\b/i.test(question);
+}
 
 export default function AnalysisTools({analysis,documents,legalReview,files=[]}){
  const [question,setQuestion]=useState("");const [answer,setAnswer]=useState(null);const [streamingAnswer,setStreamingAnswer]=useState("");const [asking,setAsking]=useState(false);const [askError,setAskError]=useState("");
@@ -25,7 +29,8 @@ export default function AnalysisTools({analysis,documents,legalReview,files=[]})
    body.append("question",question.trim());
    body.append("analysis",JSON.stringify(analysis));
    body.append("legalReview",JSON.stringify(legalReview||null));
-   // Avoid re-uploading and re-reading large source files for ordinary questions.\n   // Attach originals only when the question asks for exact source wording/location.\n   if(questionNeedsSource(question.trim()))files.forEach(file=>body.append("documents",file));
+   // Re-upload originals only when exact wording or a source location is requested.
+   if(questionNeedsSource(question.trim()))files.forEach(file=>body.append("documents",file));
    const r=await fetch("/api/documents/ask",{method:"POST",body,signal:controller.signal});
    if(!r.ok)throw new Error("Follow-up unavailable. Please try again.");
    let receivedComplete=false;
