@@ -2,7 +2,7 @@ import formidable from "formidable";
 import fs from "node:fs/promises";
 import {fileTypeFromBuffer} from "file-type";
 import mammoth from "mammoth";
-import {generateWithFallback} from "../_lib/gemini.js";
+import {streamWithFallback} from "../_lib/gemini.js";
 import {startSSE,sendEvent,endSSE,sendSafeError} from "../_lib/sse.js";
 export const config={api:{bodyParser:false}};
 const MAX_FILES=5,MAX_FILE=10*1024*1024,MAX_TOTAL=25*1024*1024,MAX_INLINE_PDF=12*1024*1024,MAX_TEXT=180000;
@@ -39,7 +39,7 @@ function clean(value){return String(value||"").replace(/[\u0000-\u0008\u000b\u00
 function isLegalQuestion(question){
   return /\b(law|legal|sue|suing|sued|court|rights?|remed(y|ies)|enforce|breach|liable|liability|statute|act\b|cama|constitution|illegal|unlawful|red ?flag|protect(ion|ed)?|damages|injunction|arbitration|dispute)\b/i.test(question);
 }
-function isSueQuestion(question){
+function needsOriginalSource(question){\n  return /\\b(clause|section|article|paragraph|page|quote|quotation|exact wording|word.?for.?word|verbatim|where (?:does|is)|what (?:does|do) .{0,35} say|in the (?:original )?document|according to (?:the )?(?:document|agreement)|wording of|text of)\\b/i.test(question);\n}\nfunction isSueQuestion(question){
   return /\b(can i sue|could i sue|may i sue|right to sue|sue (them|him|her|the|if)|take (them|him|her) to court|legal action|enforce (the )?agreement)\b/i.test(question);
 }
 
@@ -51,7 +51,7 @@ export default async function handler(req,res){
   const {fields,files}=await parse(req);const question=clean(one(fields.question));const analysis=field(fields,"analysis");const legalReview=field(fields,"legalReview");
   if(!question.trim()||question.length>1200)throw Object.assign(new Error(),{userMessage:"Enter a question of up to 1,200 characters.",kind:"invalid_request"});
   if(!analysis||typeof analysis!=="object"||Array.isArray(analysis))throw Object.assign(new Error(),{userMessage:"The active document analysis is required.",kind:"invalid_request"});
-  const raw=files.documents;const uploads=Array.isArray(raw)?raw:raw?[raw]:[];const parts=[];let total=0,inlineBytes=0,textChars=0;
+  const sourceRequested=needsOriginalSource(question);\n  const raw=sourceRequested?files.documents:null;const uploads=Array.isArray(raw)?raw:raw?[raw]:[];const parts=[];let total=0,inlineBytes=0,textChars=0;
   for(const file of uploads){
    paths.push(file.filepath);const buffer=await fs.readFile(file.filepath);buffers.push(buffer);total+=buffer.length;
    if(total>MAX_TOTAL)throw Object.assign(new Error("The source files exceed the supported combined size."),{status:413});
