@@ -60,10 +60,10 @@ export async function streamWithFallback({parts,systemInstruction,generationConf
     }
    };
    try{
-    while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let boundary;
+    while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true}).replace(/\r\n/g,"\n").replace(/\r/g,"\n");let boundary;
      while((boundary=buffer.indexOf("\n\n"))>=0){consumeFrame(buffer.slice(0,boundary));buffer=buffer.slice(boundary+2);}
     }
-    if(buffer.trim())consumeFrame(buffer);
+    buffer+=decoder.decode();if(buffer.trim())consumeFrame(buffer);
    }finally{reader.releaseLock();}
    if(!emitted.trim())throw Object.assign(new Error("Empty model response"),{kind:"empty_response",retry:true,httpStatus:502,userMessage:"The AI service returned an empty response. Please try again."});
    return {model,text:emitted};
