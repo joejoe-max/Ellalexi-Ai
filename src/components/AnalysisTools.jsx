@@ -1,11 +1,11 @@
-import {useMemo,useState} from "react";
+import {useEffect,useMemo,useState} from "react";
 import {Download,MessageCircle,Send,LoaderCircle,ClipboardCheck} from "lucide-react";
 import {buildBeforeYouSignChecklist} from "../lib/beforeYouSign.js";
 import {downloadAnalysisReport} from "../lib/pdfReport.js";
 import {consumeSSE} from "../lib/sse.js";
 export default function AnalysisTools({analysis,documents,legalReview}){
  const [question,setQuestion]=useState("");const [answer,setAnswer]=useState(null);const [streamingAnswer,setStreamingAnswer]=useState("");const [asking,setAsking]=useState(false);const [askError,setAskError]=useState("");
- const checklist=useMemo(()=>buildBeforeYouSignChecklist(analysis,legalReview),[analysis,legalReview]);
+ useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem("ellabrief-qa-session-v1")||"null");if(saved){setQuestion(saved.question||"");setAnswer(saved.answer||null)}}catch{}},[]);\n useEffect(()=>{try{localStorage.setItem("ellabrief-qa-session-v1",JSON.stringify({question,answer}))}catch{}},[question,answer]);\n const checklist=useMemo(()=>buildBeforeYouSignChecklist(analysis,legalReview),[analysis,legalReview]);
  async function ask(e){e.preventDefault();if(!question.trim()||asking)return;setAsking(true);setAskError("");setAnswer(null);setStreamingAnswer("");try{const r=await fetch("/api/documents/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:question.trim(),analysis,legalReview})});if(!r.ok)throw new Error("Follow-up unavailable. Please try again.");await consumeSSE(r,{onEvent:(event,data)=>{if(event==="delta")setStreamingAnswer(old=>old+data.text);if(event==="complete")setAnswer(data);if(event==="fallback")setStreamingAnswer("");}})}catch(e){setAskError(e.message||"Follow-up unavailable.");setStreamingAnswer("")}finally{setAsking(false)}}
  return <div className="analysis-tools">
  <section className="analysis-tool-panel" id="before-you-sign"><div className="eyebrow"><ClipboardCheck size={14}/> BEFORE YOU SIGN</div><h3>Points to resolve or discuss</h3><p className="tool-intro">A working checklist generated from this review. It is not legal clearance or a recommendation to sign.</p>{checklist.length?<div className="checklist-items">{checklist.map(x=><article className="checklist-item" key={x.id}><span className="checklist-marker"/><div><small>{x.category}</small><b>{x.title}</b><p>{x.detail}</p>{x.source&&<small>{x.source}</small>}</div></article>)}</div>:<p>No specific checklist items were generated. Review the original documents and raise anything unclear with a qualified practitioner.</p>}</section>
