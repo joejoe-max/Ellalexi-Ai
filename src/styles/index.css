@@ -169,3 +169,28 @@ h1 em, h2 em { color: var(--olive); font-family: "Newsreader", serif; font-weigh
 
 /* Stage 6 contextual analysis tools */
 .analysis-tools{display:grid;gap:14px;margin:38px 0}.analysis-tool-panel{padding:22px;border:1px solid var(--line);background:#191a17;scroll-margin-top:80px}.analysis-tool-panel>.eyebrow{display:flex;align-items:center;gap:8px;color:var(--olive)}.analysis-tool-panel h3{margin:13px 0 8px;font-family:"Newsreader",serif;font-size:25px;font-weight:400}.tool-intro{max-width:620px;margin:0;color:#9d9e93;font-size:11px;line-height:1.75}.checklist-items{display:grid;gap:0;margin-top:17px}.checklist-item{display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--line)}.checklist-marker{width:7px;height:7px;flex:0 0 7px;margin-top:6px;border:1px solid var(--olive);border-radius:50%}.checklist-item>div{min-width:0}.checklist-item small{display:block;color:#929386;font-size:9px;line-height:1.6}.checklist-item b{display:block;margin-top:3px;color:#e4e4da;font-size:12px}.checklist-item p{margin:5px 0;color:#aaa99f;font-size:11px;line-height:1.7}.analysis-ask-form{margin-top:16px}.analysis-ask-form label{display:block;margin-bottom:7px;color:#d7d7ca;font-size:11px}.analysis-ask-form textarea{width:100%;resize:vertical;padding:12px;color:var(--paper);border:1px solid var(--line);border-radius:0;background:#131310;font:inherit;font-size:12px;line-height:1.6}.analysis-ask-form textarea:focus{outline:1px solid var(--olive);border-color:var(--olive)}.ask-form-footer{display:flex;align-items:center;justify-content:space-between;margin-top:9px}.ask-form-footer small{color:#77786f;font-size:9px}.ask-form-footer button,.report-download{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:39px;padding:9px 13px;color:#202118;border:0;background:var(--olive);font-size:10px;font-weight:700;cursor:pointer}.ask-form-footer button:disabled{opacity:.45;cursor:not-allowed}.ask-error{color:#e6a28f;font-size:11px}.ask-answer{margin-top:15px;padding:15px;border-left:2px solid var(--olive);background:#20211d}.ask-answer>b{font-size:11px}.ask-answer p{color:#d0d0c5;font-size:12px;line-height:1.8;white-space:pre-wrap}.ask-answer small{display:block;color:#929386;font-size:9px;line-height:1.6}.report-tool{display:flex;align-items:center;justify-content:space-between;gap:20px}.report-tool h3{margin-bottom:5px}.report-download{flex:0 0 auto}.analysis-section-nav a[href="#before-you-sign"],.analysis-section-nav a[href="#ask-ellalexi"],.analysis-section-nav a[href="#document-report"]{color:var(--olive)}@media(max-width:560px){.analysis-tool-panel{padding:17px}.report-tool{align-items:flex-start;flex-direction:column}.report-download{width:100%}.analysis-tool-panel h3{font-size:23px}}
+
+
+/* Markdown formatting for Gemini chat responses */
+.markdown-message{color:#d0d0c5;font-size:12px;line-height:1.85;overflow-wrap:anywhere}
+.markdown-message>*:first-child{margin-top:0}
+.markdown-message>*:last-child{margin-bottom:0}
+.markdown-message p{margin:0 0 12px}
+.markdown-message h1,.markdown-message h2,.markdown-message h3,.markdown-message h4,.markdown-message h5,.markdown-message h6{margin:17px 0 8px;color:var(--paper);font-weight:600;line-height:1.35}
+.markdown-message h1{font-size:20px}.markdown-message h2{font-size:18px}.markdown-message h3{font-size:15px}.markdown-message h4,.markdown-message h5,.markdown-message h6{font-size:13px}
+.markdown-message strong{color:#f0f0e7;font-weight:700}
+.markdown-message em{color:#e0e0d4}
+.markdown-message ul,.markdown-message ol{margin:8px 0 14px;padding-left:22px}
+.markdown-message li{padding-left:3px;margin:5px 0}
+.markdown-message li::marker{color:var(--olive)}
+.markdown-message blockquote{margin:12px 0;padding:9px 13px;border-left:2px solid var(--olive);background:#191a17;color:#bdbeb2}
+.markdown-message code{padding:2px 5px;background:#303127;color:#e4e4da;font-family:ui-monospace,SFMono-Regular,monospace;font-size:.92em}
+.markdown-message .markdown-code{overflow-x:auto;margin:12px 0;padding:13px;background:#11120f;border:1px solid var(--line);white-space:pre}
+.markdown-message .markdown-code code{padding:0;background:none}
+.markdown-message a{color:var(--olive);text-decoration:underline;text-underline-offset:3px}
+.markdown-message hr{margin:14px 0;border:0;border-top:1px solid var(--line)}
+.markdown-table-wrap{max-width:100%;overflow-x:auto;margin:12px 0}
+.markdown-message table{width:100%;border-collapse:collapse;font-size:11px}
+.markdown-message th,.markdown-message td{padding:8px 10px;border:1px solid var(--line);text-align:left;vertical-align:top}
+.markdown-message th{background:#292a23;color:#e5e5d9;font-weight:600}
+.markdown-message td{color:#bdbeb2}
