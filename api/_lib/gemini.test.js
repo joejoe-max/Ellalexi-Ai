@@ -44,7 +44,7 @@ describe("Gemini provider resilience",()=>{
  });
  it("does not mix models when a stream fails after emitting text",async()=>{
   vi.stubEnv("GEMINI_API_KEY","test-key");vi.stubEnv("GEMINI_MODELS","first,second");
-  const stream=new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode('data: {"candidates":[{"content":{"parts":[{"text":"partial"}]}}]}\n\n'));controller.error(new Error("connection lost"));}});
+  const stream=new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode('data: {"candidates":[{"content":{"parts":[{"text":"partial"}]}}]}\n\n'));setTimeout(()=>controller.error(new Error("connection lost")),0);}});
   const fetch=vi.fn().mockResolvedValue({ok:true,body:stream});vi.stubGlobal("fetch",fetch);
   await expect(streamWithFallback({parts:[],generationConfig:{}})).rejects.toMatchObject({kind:"stream_interrupted"});
   expect(fetch).toHaveBeenCalledTimes(1);
