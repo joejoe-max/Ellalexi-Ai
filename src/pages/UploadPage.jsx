@@ -138,11 +138,11 @@ export default function UploadPage(){
           {!legalExpanded&&hasMoreFindings&&<div className="legal-findings-fade" aria-hidden="true"/>}
         </div>
 
-        {hasMoreFindings&&<
+        {hasMoreFindings&&(
           <button type="button" className="legal-see-more" onClick={()=>setLegalExpanded(v=>!v)}>
             {legalExpanded?<><ChevronUp size={15}/> Show less</>:<><ChevronDown size={15}/> See more ({allFindings.length-LEGAL_PREVIEW_COUNT} more)</>}
           </button>
-        }
+        )}
 
         {cleanQuestions.map((q,i)=><p key={i}>• {q}</p>)}
         {cleanLimitations.map((q,i)=><small className="legal-limitation" key={i}>{q}</small>)}
