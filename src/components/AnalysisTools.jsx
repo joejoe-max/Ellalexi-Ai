@@ -19,7 +19,7 @@ export default function AnalysisTools({analysis,documents,legalReview,files=[]})
  async function ask(e){
   e.preventDefault();
   if(!question.trim()||asking)return;
-  if(abortRef.current){try{abortRef.current.abort();}catch{}}
+  if(abortRef.current){try{abortRef.current.abort();}catch{ /* The previous request may already be closed. */ }}
   const controller=new AbortController();
   abortRef.current=controller;
   const timeoutId=setTimeout(()=>controller.abort(),ASK_TIMEOUT_MS);
