@@ -1,6 +1,15 @@
 import mammoth from "mammoth";
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import * as pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import { generateWithFallback } from "./gemini.js";
+
+// Vercel bundles API routes separately. PDF.js 4.x defaults to a dynamic worker
+// import ("pdfjs/pdf.worker.js") in Node, which can be omitted from the function
+// bundle. Register the statically imported worker so Node uses its in-process
+// worker handler instead of resolving that missing dynamic path at runtime.
+if (!globalThis.pdfjsWorker?.WorkerMessageHandler) {
+  globalThis.pdfjsWorker = pdfjsWorker;
+}
 
 export const MAX_PDF_PAGES = 150;
 export const MAX_DOCUMENT_TEXT = 120000;
@@ -34,24 +43,43 @@ export function getUnreadablePageNumbers(pages = []) {
 }
 
 export async function extractPdfPages(buffer) {
+  // Copy the upload into an owned Uint8Array: PDF.js may transfer its backing
+  // ArrayBuffer while setting up the parser.
+  const data = Uint8Array.from(buffer);
   const task = pdfjs.getDocument({
-    data: new Uint8Array(buffer),
+    data,
     isEvalSupported: false,
-    useSystemFonts: true
+    useSystemFonts: true,
+    useWorkerFetch: false
   });
-  const pdf = await task.promise;
   try {
-    if (pdf.numPages > MAX_PDF_PAGES) throw Object.assign(new Error(`PDF exceeds the ${MAX_PDF_PAGES}-page limit.`), { status: 413 });
+    const pdf = await task.promise;
+    if (pdf.numPages > MAX_PDF_PAGES) {
+      throw Object.assign(new Error(`PDF exceeds the ${MAX_PDF_PAGES}-page limit.`), { status: 413 });
+    }
     const pages = [];
     for (let number = 1; number <= pdf.numPages; number += 1) {
       const page = await pdf.getPage(number);
       const content = await page.getTextContent();
-      const text = content.items.map((item) => typeof item.str === "string" ? item.str : "").join(" ").replace(/\s+/g, " ").trim();
+      const text = content.items
+        .map((item) => typeof item.str === "string" ? item.str : "")
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
       pages.push({ page: number, text });
     }
     return pages;
   } finally {
-    await pdf.destroy();
+    // Destroy the loading task even when parsing fails before a PDFDocumentProxy
+    // is created. Do not let a cleanup error hide the original parser failure.
+    try {
+      await task.destroy();
+    } catch (cleanupError) {
+      console.warn("[ellabrief-pdf-cleanup]", {
+        name: cleanupError?.name || "Error",
+        message: String(cleanupError?.message || "PDF cleanup failed").slice(0, 180)
+      });
+    }
   }
 }
 
@@ -156,7 +184,9 @@ export async function preparePdfDocument(buffer, { onStatus } = {}) {
     pages = await extractPdfPages(buffer);
   } catch (error) {
     if (error.status) throw error;
-    throw Object.assign(new Error("The PDF text layer could not be read."), {
+    // Preserve the original PDF.js exception for server-side diagnostics. The
+    // client still receives the same safe, generic message.
+    throw Object.assign(new Error("The PDF text layer could not be read.", { cause: error }), {
       kind: "pdf_extraction_error",
       httpStatus: 422,
       userMessage: "This PDF could not be read. Check that it is not encrypted or damaged, then try again."
