@@ -10,7 +10,7 @@ The idea for EllaBrief came from a personal experience.
 
 I was considering signing an agreement with a startup. I read through the document, but there were several things I did not understand. I was unsure about what I would be agreeing to, what the terms meant in practice, and what risks I might be taking on.
 
-I sought help from someone in Prague who had a background in legal studies and was still pursuing her legal education. She helped me go through the document and understand what it meant. That process brought some important issues to light: the agreement contained risks I had not recognised on my own. With a clearer understanding of what I was being asked to accept, I decided not to sign it.
+I sought help from someone who had studied law and was still pursuing her legal education. She helped me go through the document and understand what it meant. That process brought some important issues to light: the agreement contained risks I had not recognised on my own. With a clearer understanding of what I was being asked to accept, I decided not to sign it.
 
 That experience left me thinking about people who find themselves in the same position but do not have someone they can turn to for help. Someone might be handed an employment contract, startup agreement, tenancy document, or another important legal document and feel pressured to sign without fully understanding the terms. They may not know what to look out for, what questions to ask, or where a clause could put them at a disadvantage.
 
