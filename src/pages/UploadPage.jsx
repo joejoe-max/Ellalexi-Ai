@@ -128,7 +128,7 @@ export default function UploadPage(){
                   {legalIsPrinciples&&<p>Below is guidance based on ordinary Nigerian legal principles for this kind of document. It is educational, not a formal legal opinion.</p>}
                   {legalStatus==="insufficient_sources"&&!legalIsPrinciples&&<p>EllaBrief could not retrieve a clear, citable Nigerian legal provision for the issues raised. The document explanation above still stands.</p>}
           
-                  <div className={`legal-findings-wrap ${!legalExpanded&&hasMoreFindings?"is-collapsed":"is-expanded"}`}>
+                  <div className="legal-findings-wrap">
                     {shownFindings.map((f,i)=><article className="legal-finding" key={i}>
                       <b>{f.topic}</b>
                       <p><strong>Document position:</strong> {f.documentPosition}</p>
@@ -137,14 +137,8 @@ export default function UploadPage(){
                       {(f.citations||[]).length>0&&<div className="legal-inline-citations" aria-label="Legal sources">{f.citations.map((c,ci)=><span className="legal-citation" key={c.sourceId||ci}>[{c.authority}{c.year?`, ${c.year}`:""}{c.provisionVerified&&c.provision?`, ${c.provision}`:""}{c.publisher?`, ${c.publisher}`:""}] {c.url&&<a href={c.url} target="_blank" rel="noreferrer">View source</a>}{ci<f.citations.length-1?"; ":""}</span>)}</div>}
                       {f.caveat&&!/not formal legal advice|educational guidance from general principles/i.test(f.caveat)&&<small>{f.caveat}</small>}
                     </article>)}
-                    {!legalExpanded&&hasMoreFindings&&<div className="legal-findings-fade" aria-hidden="true"/>}
                   </div>
-          
-                  {hasMoreFindings&&(
-                    <button type="button" className="legal-see-more" onClick={()=>setLegalExpanded(v=>!v)}>
-                      {legalExpanded?<><ChevronUp size={15}/> Show less</>:<><ChevronDown size={15}/> See more ({allFindings.length-LEGAL_PREVIEW_COUNT} more)</>}
-                    </button>
-                  )}
+
           
                   {cleanQuestions.map((q,i)=><p key={i}>• {q}</p>)}
                   {cleanLimitations.map((q,i)=><small className="legal-limitation" key={i}>{q}</small>)}
