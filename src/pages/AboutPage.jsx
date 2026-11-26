@@ -3,7 +3,7 @@ import {ArrowLeft,ArrowUpRight,Scale,ShieldCheck,HeartHandshake,BookOpen,Users,V
 
 const initiatives=[
  {number:"01",icon:Scale,title:"Legal education",tag:"KNOWLEDGE",text:"A weekly legal education series from the Office of the Attorney General, created to bring legal ideas closer to everyday student life."},
- {number:"02",icon:ShieldCheck,title:"Know Your Rights",tag:"CAMPUS SAFETY",text:"A campus awareness campaign on sexual and gender-based violence, delivered with Shield the Child Foundation and the Akwa Ibom State GBV Management Committee. It focused on reporting pathways, survivor support and access to help."},
+ {number:"02",icon:ShieldCheck,title:"Know Your Rights",tag:"CAMPUS SAFETY",text:"A campus awareness campaign on sexual and gender-based violence, delivered in partnership with Shield the Child Foundation. It focused on reporting pathways, survivor support and access to help."},
  {number:"03",icon:HeartHandshake,title:"Love & The Law",tag:"CONSENT & AWARENESS",text:"A weekly series exploring love and consent through the lens of the law — making important conversations easier for students to approach."},
  {number:"04",icon:FileCheck2,title:"Centralised oath-taking",tag:"STUDENT SERVICES",text:"Her 100-day report highlighted the centralisation of oath-taking and mass swearing-in ceremonies to make the process more organised."},
  {number:"05",icon:Users,title:"Student support",tag:"WELFARE",text:"The report also recorded the distribution of asthma relief supplies, sanitary pads and stationery to students."},
