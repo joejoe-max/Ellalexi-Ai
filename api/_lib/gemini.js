@@ -1,6 +1,6 @@
 // Prefer currently supported Gemini Flash models. Override order with GEMINI_MODELS if needed.
-const DEFAULT_MODELS=["gemini-3.8-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite"];
-export function getModels(){const configured=(process.env.GEMINI_MODELS||"").split(",").map(x=>x.trim()).filter(Boolean);return [...new Set(configured.length?configured:DEFAULT_MODELS)].slice(0,4)}
+const DEFAULT_MODELS=["gemini-3.1-flash-lite","gemini-3.5-flash-lite","gemini-3.8-flash"];
+export function getModels(){const configured=(process.env.GEMINI_OCR_MODELS||process.env.GEMINI_MODELS||"").split(",").map(x=>x.trim()).filter(Boolean);return [...new Set(configured.length?configured:DEFAULT_MODELS)].slice(0,4)}
 export function classifyProviderError(status,payload={},cause){
  const reason=String(payload?.error?.status||payload?.error?.details?.[0]?.reason||"").toUpperCase();
  if(cause?.name==="TimeoutError"||cause?.name==="AbortError")return {kind:"timeout",retry:true,httpStatus:504,message:"The AI request took too long. Please try again."};

@@ -1,0 +1,3 @@
+import{describe,it,expect}from"vitest";
+import{isMeaningfulPageText,getUnreadablePageNumbers}from"./documentExtraction.js";
+describe("PDF text quality detection",()=>{it("recognises selectable page text",()=>{expect(isMeaningfulPageText("This page contains enough selectable legal document text to analyse properly.")).toBe(true)});it("flags image-only and decorative pages without text",()=>{expect(isMeaningfulPageText("")).toBe(false);expect(isMeaningfulPageText("LOGO")).toBe(false)});it("returns only pages needing OCR",()=>{expect(getUnreadablePageNumbers([{page:1,text:"This page contains enough selectable legal document text to analyse properly."},{page:2,text:""},{page:3,text:"x"}])).toEqual([2,3])})});

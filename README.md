@@ -37,7 +37,8 @@ Upload up to 5 PDF or DOCX files together (10 MB per file; 25 MB total).
 
 - PDF.js extracts selectable text from PDFs and preserves page markers.
 - Mammoth extracts text from DOCX files.
-- Scanned or image-only PDFs are flagged because they require OCR.
+- PDF pages without meaningful selectable text are sent to OCR; pages with selectable text are not needlessly OCRed.
+- Gemini is reserved for scanned-page OCR, with Tesseract.js as a local OCR fallback.
 - Uploaded documents are temporarily processed and are not stored in the legal knowledge base.
 
 ## Technology
@@ -45,16 +46,18 @@ Upload up to 5 PDF or DOCX files together (10 MB per file; 25 MB total).
 - React 19, Vite, JavaScript
 - Tailwind CSS v4
 - Vercel serverless functions
-- Gemini API for AI-powered document analysis and follow-up
+- Groq for primary AI reasoning and legal web search
+- OpenRouter for provider-wide reasoning fallback
+- Gemini Flash-Lite for scanned-page OCR only
 - PDF.js for PDF text extraction
 - Mammoth for DOCX text extraction
 - Vitest for testing
 
 ## AI streaming and configuration
 
-AI analysis, legal-source review, and follow-up use a shared Server-Sent Events (SSE) response protocol with safe provider errors and configurable Gemini Flash model fallback.
+AI analysis, legal-source review, and follow-up use a shared Server-Sent Events (SSE) response protocol. Groq models fail over in sequence; OpenRouter is the provider-wide reasoning fallback. Legal search uses Groq browser search and validates full source pages against a trusted HTTPS host allowlist. Historical local legal references are a supplementary fallback only and do not prove current law.
 
-Configure `GEMINI_API_KEY` in the server environment. `GEMINI_MODELS` can optionally be used to configure model fallback. See [docs/STAGE-7.md](docs/STAGE-7.md) for the event contract and documented limitations.
+Configure `GROQ_API_KEY`, `OPENROUTER_API_KEY`, and `GEMINI_API_KEY` in the server environment. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for provider routing, model settings, free-tier limitations and safety boundaries. Gemini is OCR-only.
 
 ## Development
 
