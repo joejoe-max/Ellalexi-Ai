@@ -3,22 +3,34 @@ import {generateWithFallback} from "../_lib/gemini.js";
 import {startSSE,sendEvent,endSSE,sendSafeError} from "../_lib/sse.js";
 
 const SCHEMA = { type:"OBJECT", properties:{
-  status:{type:"STRING",enum:["verified_sources_found","insufficient_sources","conflicting_sources"]},
+  status:{type:"STRING",enum:["verified_sources_found","insufficient_sources","conflicting_sources","general_principles"]},
   summary:{type:"STRING"},
   findings:{type:"ARRAY",items:{type:"OBJECT",properties:{
     topic:{type:"STRING"},documentPosition:{type:"STRING"},legalPosition:{type:"STRING"},
     jurisdiction:{type:"STRING"},authority:{type:"STRING"},provision:{type:"STRING"},
-    effectiveStatus:{type:"STRING",enum:["currentness_verified","historical_or_unverified","unclear"]},
+    effectiveStatus:{type:"STRING",enum:["currentness_verified","historical_or_unverified","unclear","general_principle"]},
     confidence:{type:"STRING",enum:["high","moderate","low","insufficient"]},sourceIds:{type:"ARRAY",items:{type:"INTEGER"}},caveat:{type:"STRING"}
   },required:["topic","documentPosition","legalPosition","jurisdiction","authority","provision","effectiveStatus","confidence","sourceIds","caveat"]}},
   unresolvedQuestions:{type:"ARRAY",items:{type:"STRING"}},limitations:{type:"ARRAY",items:{type:"STRING"}}
 },required:["status","summary","findings","unresolvedQuestions","limitations"]};
 
-const SYSTEM = "You are EllaBrief AI's Nigerian legal-source comparison component. Use ONLY supplied retrieved excerpts as evidence. Never rely on general model knowledge as proof of Nigerian law. Never invent Acts, sections, cases, dates, quotations or legal rules. Distinguish document text from source text and inference. Distinguish enacted laws from bills, proposals, policy announcements and news. A newer upload does not prove commencement, repeal or legal effect. Treat source authority/status metadata as context. A live search result is not automatically current or authoritative. Do not say currentness is verified unless retrieved source text explicitly establishes the relevant legal effect and date. Distinguish federal and state law. Do not infer state law from federal materials. Every finding must cite sourceIds that support it. If no excerpt supports a finding, omit it and add an unresolved question. Never advise signing or not signing, and do not claim enforceability. If no useful excerpts are supplied, return insufficient_sources and no findings.";
+const SYSTEM_VERIFIED = "You are EllaBrief AI's Nigerian legal-source comparison component. Use ONLY supplied retrieved excerpts as evidence. Never invent Acts, sections, cases, dates, quotations or legal rules that are not supported by the excerpts. Distinguish document text from source text. Distinguish enacted laws from bills and news. Do not say currentness is verified unless retrieved source text establishes legal effect and date. Every finding must cite sourceIds that support it. Never advise signing or not signing.";
+
+const SYSTEM_PRINCIPLES = `You are EllaBrief AI's Nigerian legal-education component for document reviews.
+A live primary-source page could not be retrieved. Your job is still to help the user understand how ordinary Nigerian legal principles typically relate to THIS document.
+
+Rules:
+- Base documentPosition strictly on the supplied analysis (what the document says).
+- legalPosition must explain general Nigerian principles relevant to that point (contract, companies/CAMA-style concepts for contributor/startup/equity offers, IP assignment, confidentiality, dispute resolution, limitation of liability, etc.).
+- Do NOT invent specific section numbers, gazette dates, or case names.
+- Set effectiveStatus to "general_principle", confidence to "moderate" or "low", sourceIds to [], authority to "General Nigerian legal principles (not a verified statutory citation)", provision to "General principle — not a verified section citation".
+- Highlight practical red flags: one-sided IP assignment, short review deadlines, exclusive company-friendly dispute terms, unpaid contribution in exchange for uncertain future equity, broad confidentiality, etc.
+- Never advise sign / don't sign. Never claim court outcomes.
+- status must be "general_principles".
+- Produce 3–6 useful findings tied to real issues in the analysis.`;
 
 const send = (res,status,data) => { if(status===200)sendEvent(res,"complete",data);else sendEvent(res,"error",{message:data.error||"Legal verification could not be completed.",code:data.code||"legal_review_error"});endSSE(res);return data; };
 
-/** Infer a practical document type so legal search can target the right body of Nigerian law. */
 function inferDocumentType(analysis) {
   const text = [
     analysis.documentOverview,
@@ -28,7 +40,7 @@ function inferDocumentType(analysis) {
   ].join(" ").toLowerCase();
 
   if (/tenanc|lease agreement|landlord|tenant|rent control|premises|sub-?let/.test(text)) return "tenancy / lease agreement";
-  if (/shareholder|subscription agreement|founders? agreement|cap table|equity|ordinary shares|preference shares/.test(text)) return "shareholders / founders agreement";
+  if (/contributor|startup|founders?|equity grant|share option|vesting|cap table|ordinary shares|preference shares|shareholder|subscription agreement|offer to contributors/.test(text)) return "startup / founders / contributor agreement";
   if (/employment|employee|employer|termination of employment|probation|salary|staff handbook/.test(text)) return "employment contract";
   if (/non[- ]?disclosure|nda\b|confidentiality agreement|trade secret/.test(text)) return "non-disclosure agreement";
   if (/loan agreement|facility agreement|borrower|lender|repayment|interest rate|security interest/.test(text)) return "loan / facility agreement";
@@ -39,19 +51,18 @@ function inferDocumentType(analysis) {
   return "commercial agreement";
 }
 
-/** Map document type to Nigerian legal search cues (Acts / concepts to look for). */
 function legalCuesForType(docType) {
   const map = {
     "tenancy / lease agreement": "tenancy agreement Nigeria Recovery of Premises Act Rent Control landlord tenant rights obligations",
-    "shareholders / founders agreement": "Companies and Allied Matters Act CAMA shareholders agreement Nigeria directors duties",
+    "startup / founders / contributor agreement": "Companies and Allied Matters Act CAMA Nigeria founders agreement shareholders equity vesting intellectual property assignment contributor",
     "employment contract": "Labour Act Nigeria employment contract termination redundancy employee rights",
     "non-disclosure agreement": "confidentiality non-disclosure agreement Nigeria trade secrets contract law",
-    "loan / facility agreement": "loan agreement Nigeria interest security mortgage Bills of Exchange Act",
-    "sale / supply agreement": "Sale of Goods Act Nigeria contract for sale of goods supply agreement",
-    "partnership / joint venture agreement": "Partnership Act Nigeria joint venture agreement partners liability",
-    "service / consultancy agreement": "contract for services Nigeria independent contractor consultancy agreement",
-    "deed / power of attorney": "Power of Attorney Nigeria Conveyancing Act deed execution",
-    "commercial agreement": "Nigerian contract law agreement enforceability obligations"
+    "loan / facility agreement": "loan agreement Nigeria interest security mortgage",
+    "sale / supply agreement": "Sale of Goods Act Nigeria contract for sale of goods",
+    "partnership / joint venture agreement": "Partnership Act Nigeria joint venture agreement",
+    "service / consultancy agreement": "contract for services Nigeria independent contractor",
+    "deed / power of attorney": "Power of Attorney Nigeria Conveyancing Act",
+    "commercial agreement": "Nigerian contract law agreement breach damages obligations"
   };
   return map[docType] || map["commercial agreement"];
 }
@@ -69,6 +80,43 @@ function buildQuery(analysis) {
     pieces.push(question.question);
   }
   return pieces.filter(Boolean).join(" ").slice(0, 9000);
+}
+
+async function generatePrinciplesGuidance(compact, docType, onFallback) {
+  const input = JSON.stringify({ documentType: docType, analysis: compact });
+  const generated = await generateWithFallback({
+    systemInstruction: SYSTEM_PRINCIPLES,
+    parts: [{
+      text: "Provide general Nigerian legal-principle guidance for this " + docType + ". Tie each finding to issues in the analysis. Do not invent section numbers.\n\n" + input
+    }],
+    generationConfig: { temperature: 0.25, maxOutputTokens: 5000, responseMimeType: "application/json", responseSchema: SCHEMA },
+    timeout: 75000,
+    onFallback
+  });
+  let result;
+  try { result = JSON.parse(generated.text); }
+  catch { return null; }
+  if (!Array.isArray(result.findings)) return null;
+  result.status = "general_principles";
+  result.mode = "general_principles";
+  result.findings = result.findings.map(f => ({
+    ...f,
+    sourceIds: [],
+    citations: [],
+    effectiveStatus: "general_principle",
+    authority: f.authority || "General Nigerian legal principles (not a verified statutory citation)",
+    provision: f.provision || "General principle — not a verified section citation",
+    confidence: f.confidence === "high" ? "moderate" : (f.confidence || "moderate"),
+    caveat: f.caveat || "This is educational guidance from general principles, not a verified citation to a specific Act section. Confirm with a qualified Nigerian legal practitioner."
+  }));
+  if (!result.summary) {
+    result.summary = "General Nigerian legal principles relevant to this " + docType;
+  }
+  result.limitations = Array.isArray(result.limitations) ? result.limitations : [];
+  result.limitations.push("No live primary-source page was retrieved for this review. Guidance is based on ordinary Nigerian legal principles, not a verified statutory extract.");
+  result.limitations.push("Specific section numbers and case authorities were intentionally omitted because they were not independently verified from a retrieved source.");
+  result.unresolvedQuestions = Array.isArray(result.unresolvedQuestions) ? result.unresolvedQuestions : [];
+  return { result, model: generated.model };
 }
 
 export default async function handler(req, res) {
@@ -110,31 +158,41 @@ export default async function handler(req, res) {
     const live = await searchLiveLegalSources(query, { apiKey: process.env.GEMINI_API_KEY });
     const combined = live.sources.slice(0, 6);
     const warnings = [...(live.warnings || [])].filter(w =>
-      // Never surface internal architecture language to the user
       !/local repository|historical fallback|local source index/i.test(w)
     );
 
     if (!combined.length) {
+      sendEvent(res, "status", { message: "Primary sources unavailable — preparing general legal principles for this document type…" });
+      const principles = await generatePrinciplesGuidance(compact, docType, () =>
+        sendEvent(res, "fallback", { message: "Trying another AI model…" })
+      );
+      if (principles) {
+        return send(res, 200, {
+          ok: true,
+          model: principles.model,
+          result: principles.result,
+          sources: [],
+          sourceCatalog: [],
+          warnings,
+          search: { liveAttempted: live.searched, liveSources: 0, documentType: docType, mode: "general_principles" },
+          notice: "Educational legal information based on general Nigerian principles, not formal advice. Confirm important points with a qualified Nigerian legal practitioner."
+        });
+      }
       return send(res, 200, {
         ok: true,
         model: null,
         result: {
           status: "insufficient_sources",
-          summary: `We could not confirm a specific Nigerian legal provision that clearly applies to the issues in this ${docType}.`,
+          summary: "Limited legal guidance could be prepared for this " + docType + ".",
           findings: [],
-          unresolvedQuestions: [
-            "A relevant legal provision could not be retrieved in full for the issues raised. Treat the document analysis as an explanation of the text, not a statement of current law."
-          ],
-          limitations: [
-            "Only retrieved primary-source pages are treated as evidence. Search snippets alone are not used.",
-            "Absence of a retrieved source does not mean no law applies; it means EllaBrief could not surface a reliable citation for this review."
-          ]
+          unresolvedQuestions: ["A primary legal source page could not be retrieved, and general guidance could not be completed. The document analysis above still stands."],
+          limitations: ["Absence of a retrieved source does not mean no law applies."]
         },
         sources: [],
         sourceCatalog: [],
         warnings,
         search: { liveAttempted: live.searched, liveSources: 0, documentType: docType },
-        notice: "Source-assisted information, not legal advice. No current-law conclusion is made."
+        notice: "Source-assisted information, not legal advice."
       });
     }
 
@@ -157,9 +215,9 @@ export default async function handler(req, res) {
 
     sendEvent(res, "status", { message: "Comparing retrieved source passages with the document…" });
     const generated = await generateWithFallback({
-      systemInstruction: SYSTEM,
+      systemInstruction: SYSTEM_VERIFIED,
       parts: [{
-        text: "Compare the document issues with the retrieved Nigerian legal source excerpts. The document appears to be a " + docType + ". Use sourceIds exactly as supplied. Do not infer that a source is current merely because it appeared in live search.\n\n" + input
+        text: "Compare the document issues with the retrieved Nigerian legal source excerpts. The document appears to be a " + docType + ". Use sourceIds exactly as supplied.\n\n" + input
       }],
       generationConfig: { temperature: 0.1, maxOutputTokens: 6000, responseMimeType: "application/json", responseSchema: SCHEMA },
       timeout: 90000,
@@ -213,9 +271,27 @@ export default async function handler(req, res) {
       return citations.length ? [{ ...f, citations }] : [];
     });
 
-    if (!result.findings.length) result.status = "insufficient_sources";
+    if (!result.findings.length) {
+      sendEvent(res, "status", { message: "Preparing general legal principles for this document type…" });
+      const principles = await generatePrinciplesGuidance(compact, docType, () =>
+        sendEvent(res, "fallback", { message: "Trying another AI model…" })
+      );
+      if (principles) {
+        return send(res, 200, {
+          ok: true,
+          model: principles.model,
+          result: principles.result,
+          sources: [],
+          sourceCatalog: [],
+          warnings,
+          search: { liveAttempted: live.searched, liveSources: live.sources.length, documentType: docType, mode: "general_principles" },
+          notice: "Educational legal information based on general Nigerian principles, not formal advice. Confirm important points with a qualified Nigerian legal practitioner."
+        });
+      }
+      result.status = "insufficient_sources";
+    }
+
     result.limitations.push("Live web discovery can miss relevant laws or amendments. A retrieved page does not alone establish commencement, repeal, currentness or legal effect.");
-    result.limitations.push("Only retrieved source pages are considered here; if no relevant page was found, no legal conclusion is presented.");
 
     return send(res, 200, {
       ok: true,
