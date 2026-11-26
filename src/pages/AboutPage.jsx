@@ -1,5 +1,5 @@
 import {Link} from "react-router-dom";
-import {ArrowLeft,ArrowUpRight,Scale,ShieldCheck,HeartHandshake,BookOpen,Users,VolumeX,FileCheck2,Quote} from "lucide-react";
+import {ArrowLeft,ArrowUpRight,Scale,ShieldCheck,HeartHandshake,BookOpen,Users,VolumeX,FileCheck2,Quote,Facebook,Instagram,Linkedin} from "lucide-react";
 
 const initiatives=[
  {number:"01",icon:Scale,title:"Legal education",tag:"KNOWLEDGE",text:"A weekly legal education series from the Office of the Attorney General, created to bring legal ideas closer to everyday student life."},
@@ -44,13 +44,20 @@ export default function AboutPage(){return <main className="about-page section-w
   </div>
   <div className="meet-work-heading"><div><div className="about-kicker">03 / WORK & INITIATIVES</div><h3>Service, beyond the title.</h3></div><p>A look at initiatives attributed to her office during the 2025/26 session.</p></div>
   <div className="meet-work">{initiatives.map(item=>{const Icon=item.icon;return <article className="meet-work-card" key={item.number}><div className="meet-card-top"><span>{item.number}</span><Icon size={20} strokeWidth={1.6}/></div><div className="meet-card-tag">{item.tag}</div><h4>{item.title}</h4><p>{item.text}</p></article>})}</div>
-  <div className="meet-beyond">
-  <div className="about-kicker">BEYOND THE ATTORNEY GENERAL'S OFFICE</div>
-  <h3>Continuing the work.</h3>
-  <p>In a public LinkedIn post, Itoro Gabriel wrote about speaking on “The Silent Struggles: When Young People Suffer in Silence” on 28 August 2026. The post also announced her appointment as Community Manager of the We4Us Project. These are later activities, separate from her SUG tenure.</p>
+  <section className="meet-beyond">
+  <div className="meet-beyond-inner">
+   <div className="about-kicker">04 / BEYOND THE SUG OFFICE</div>
+   <h3>Her work did not end with the handover.</h3>
+   <p>After her tenure as Students’ Attorney General, Itoro continued to engage with conversations around young people, wellbeing and community. In a public LinkedIn post, she shared that she spoke on <strong>“The Silent Struggles: When Young People Suffer in Silence”</strong> on 28 August 2026, discussing its causes, consequences and possible remedies. In the same post, she announced her appointment as Community Manager of the We4Us Project.</p>
+   <a className="meet-read-link" href="https://ng.linkedin.com/in/itoro-gabriel-4b5623252" target="_blank" rel="noreferrer">Read her post on LinkedIn <ArrowUpRight size={15}/></a>
+  </div>
+ </section>
+ <div className="meet-social-links"><span>FOLLOW / CONNECT</span>
+  <a href="https://www.facebook.com/profile.php?id=61582406414692" target="_blank" rel="noreferrer" aria-label="Ella Itoro Gabby on Facebook"><Facebook size={17}/> Facebook <ArrowUpRight size={13}/></a>
+  <a href="https://ng.linkedin.com/in/itoro-gabriel-4b5623252" target="_blank" rel="noreferrer" aria-label="Ella Itoro Gabby on LinkedIn"><Linkedin size={17}/> LinkedIn <ArrowUpRight size={13}/></a>
+  <span className="meet-social-pending" aria-label="Instagram profile not yet verified"><Instagram size={17}/> Instagram · profile not yet verified</span>
  </div>
- <div className="meet-social-links"><span>PUBLIC PROFILES</span><a href="https://www.facebook.com/profile.php?id=61582406414692" target="_blank" rel="noreferrer">Facebook <ArrowUpRight size={13}/></a><a href="https://ng.linkedin.com/in/itoro-gabriel-4b5623252" target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={13}/></a></div>
- <div className="meet-source-note">Profile details and initiative summaries are based on information supplied for this page and publicly indexed posts from the LinkedIn profile linked above. The Facebook profile link was supplied directly; Facebook did not expose its contents to this research session, so no additional claims have been attributed to it.</div>
+ <div className="meet-source-note">The LinkedIn link opens her public profile, where the referenced post is visible. Facebook was supplied directly. An Instagram account could not be confidently matched to her, so no unverified profile is linked.</div>
  </section>
  <section className="about-closing"><div><div className="about-kicker">THE IDEA CONTINUES</div><h2>Understand the document.<br/><em>Then decide with clarity.</em></h2><p>Whatever the opportunity, know what the words mean before you put your name to them.</p></div><Link className="about-cta" to="/upload">Review a document <ArrowUpRight size={16}/></Link></section>
  </main>}
