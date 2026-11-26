@@ -49,7 +49,7 @@ export default function AboutPage(){return <main className="about-page section-w
    <div className="about-kicker">04 / BEYOND THE SUG OFFICE</div>
    <h3>Her work did not end with the handover.</h3>
    <p>After her tenure as Students’ Attorney General, Itoro continued to engage with conversations around young people, wellbeing and community. In a public LinkedIn post, she shared that she spoke on <strong>“The Silent Struggles: When Young People Suffer in Silence”</strong> on 28 August 2026, discussing its causes, consequences and possible remedies. In the same post, she announced her appointment as Community Manager of the We4Us Project.</p>
-   <a className="meet-read-link" href="https://ng.linkedin.com/in/itoro-gabriel-4b5623252" target="_blank" rel="noreferrer">Read her post on LinkedIn <ArrowUpRight size={15}/></a>
+   <a className="meet-read-link" href="https://lnkd.in/p/dpJAtwAt" target="_blank" rel="noreferrer">Read her post on LinkedIn <ArrowUpRight size={15}/></a>
   </div>
  </section>
  <div className="meet-social-links"><span>FOLLOW / CONNECT</span>
