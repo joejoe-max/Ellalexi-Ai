@@ -13,8 +13,8 @@ export default async function handler(req,res){
   const context=JSON.stringify({documentOverview:analysis.documentOverview,executiveSummary:analysis.executiveSummary,parties:analysis.parties,clauses:analysis.clauses,rightsAndObligations:analysis.rightsAndObligations,risks:analysis.risks,moneyMatters:analysis.moneyMatters,missingProtections:analysis.missingProtections,questions:analysis.questions,crossDocumentFindings:analysis.crossDocumentFindings,limitations:analysis.limitations,legalReview:legalReview||null});
   if(context.length>80000)throw Object.assign(new Error(),{userMessage:"This analysis is too large for follow-up. Ask a more specific question.",kind:"invalid_request"});
   sendEvent(res,"status",{message:"Preparing your answer…"});
-  const {model,text}=await generateWithFallback({systemInstruction:SYSTEM,parts:[{text:"ACTIVE ANALYSIS (structured summary only; not original source text):\n"+context+"\n\nUSER QUESTION:\n"+question.trim()}],generationConfig:{temperature:0.15,maxOutputTokens:1800},timeout:45000,onFallback:()=>sendEvent(res,"fallback",{message:"Trying another AI model…"})});
+  const {model,text}=await generateWithFallback({systemInstruction:SYSTEM,parts:[{text:"ACTIVE ANALYSIS (structured summary only; not original source text):\n"+context+"\n\nUSER QUESTION:\n"+question.trim()}],generationConfig:{temperature:0.15,maxOutputTokens:1800},timeout:45000,onFallback:()=>{}});
   const answer=text.trim();if(!answer)throw Object.assign(new Error(),{userMessage:"The assistant returned an empty answer. Please rephrase your question.",kind:"empty_response"});
-  sendEvent(res,"delta",{text:answer});sendEvent(res,"complete",{answer,scope,model});endSSE(res);
+  sendEvent(res,"delta",{text:answer});sendEvent(res,"complete",{answer,scope});endSSE(res);
  }catch(error){sendSafeError(res,error);}
 }
