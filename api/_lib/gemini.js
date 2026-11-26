@@ -29,7 +29,7 @@ export async function generateWithFallback({parts,systemInstruction,generationCo
     catch(cause){throw Object.assign(new Error("The model response failed validation."),{kind:"invalid_response",retry:true,httpStatus:502,userMessage:"The AI service returned an incomplete analysis. Please try again.",responseLength:text.length,finishReason,validationError:String(cause?.message||"invalid response").slice(0,120)});}
    }
    return {model,text,payload,finishReason,...(validateResponse?{validated}:{})};
-  }catch(cause){const classified=classifyProviderError(0,{},cause);const err=cause?.retry?{...classified,kind:cause.kind||"invalid_response",retry:true,message:cause.userMessage||"The AI service returned an incomplete response. Please try again."}:classified;last=Object.assign(new Error(err.message),{...err,userMessage:err.message,model});if(!err.retry||i===models.length-1)break;onFallback?.(models[i+1]);}
+  }catch(cause){const classified=classifyProviderError(0,{},cause);const err=cause?.retry?{...classified,kind:cause.kind||"invalid_response",retry:true,message:cause.userMessage||"The AI service returned an incomplete response. Please try again."}:classified;last=Object.assign(new Error(err.message),{...err,userMessage:err.message,model,finishReason:cause.finishReason||null,responseLength:Number.isFinite(cause.responseLength)?cause.responseLength:null,validationError:cause.validationError||null});if(!err.retry||i===models.length-1)break;onFallback?.(models[i+1]);}
  }
  throw last||Object.assign(new Error("AI unavailable"),{httpStatus:503,userMessage:"EllaBrief is temporarily unavailable. Please try again shortly."});
 }
