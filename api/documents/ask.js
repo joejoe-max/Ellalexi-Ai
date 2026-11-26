@@ -34,6 +34,7 @@ Use simple terms. Be concrete and useful.`;
 function parse(req){const form=formidable({multiples:true,maxFiles:MAX_FILES,maxFileSize:MAX_FILE,maxTotalFileSize:MAX_TOTAL,allowEmptyFiles:false,minFileSize:1,keepExtensions:true});return new Promise((resolve,reject)=>form.parse(req,(e,fields,files)=>e?reject(e):resolve({fields,files})));}
 const one=value=>Array.isArray(value)?value[0]:value;
 function field(fields,key){const value=one(fields[key]);if(typeof value!=="string")return null;try{return JSON.parse(value);}catch{return null;}}
+/* eslint-disable no-control-regex */
 function clean(value){return String(value||"").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,"");}
 
 function isLegalQuestion(question){
@@ -94,5 +95,5 @@ export default async function handler(req,res){
   const {text}=await streamWithFallback({systemInstruction:SYSTEM,parts,generationConfig:{temperature:0.2,maxOutputTokens:2800},timeout:65000,onToken:chunk=>sendEvent(res,"delta",{text:chunk}),onFallback:model=>sendEvent(res,"fallback",{model})});
   const answer=String(text||"").trim();if(!answer)throw Object.assign(new Error(),{userMessage:"The assistant returned an empty answer. Please rephrase your question.",kind:"empty_response"});
   sendEvent(res,"complete",{answer});endSSE(res);
- }catch(error){sendSafeError(res,error);}finally{for(const buffer of buffers)buffer.fill(0);for(const path of paths){try{await fs.unlink(path);}catch{}}}
+ }catch(error){sendSafeError(res,error);}finally{for(const buffer of buffers)buffer.fill(0);for(const path of paths){try{await fs.unlink(path);}catch{ /* Ignore malformed optional fields; validation below returns a safe error. */ }}}
 }
