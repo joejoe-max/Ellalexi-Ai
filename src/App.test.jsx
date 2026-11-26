@@ -15,7 +15,7 @@ describe("EllaBrief application foundation", () => {
     expect(screen.getByText(/does not make the decision for you or replace a lawyer/i)).toBeInTheDocument();
   });
 
-  it("provides a useful not-found page for unknown routes", () => {
+  it("opens the About page and shows the origin story and Meet Ella section", () => {\n    render(<MemoryRouter initialEntries={["/about"]}><App /></MemoryRouter>);\n    expect(screen.getByRole("heading", { name: /meet ella/i })).toBeInTheDocument();\n    expect(screen.getByText(/startup agreement/i)).toBeInTheDocument();\n    expect(screen.getByRole("img", { name: /portrait of ella itoro gabby/i })).toHaveAttribute("src", "/ella-itoro-gabby.jpg");\n  });\n\n  it("provides a useful not-found page for unknown routes", () => {
     render(
       <MemoryRouter initialEntries={["/unknown-route"]}>
         <App />
