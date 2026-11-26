@@ -160,3 +160,40 @@ h1 em, h2 em { color: var(--olive); font-family: "Newsreader", serif; font-weigh
 }
 
 .coming-soon-button:hover,.coming-soon-button:focus-visible{background:#e1e4bb;outline:2px solid var(--olive);outline-offset:3px}
+
+
+/* About page */
+.header-nav a[href="/about"]{color:var(--olive)}
+.about-page{padding-block:52px 100px}
+.about-back{display:inline-flex;align-items:center;gap:8px;color:#a9aa9e;font-size:12px}
+.about-hero{max-width:760px;padding-block:76px 68px}
+.about-hero h1{margin:22px 0 20px;font-size:clamp(48px,7vw,76px);line-height:.98;letter-spacing:-4px;font-weight:500}
+.about-hero>p{max-width:660px;color:#aaa99f;font-size:16px;line-height:1.9}
+.about-story{display:grid;grid-template-columns:.7fr 1.3fr;gap:56px;padding:42px 0 76px;border-top:1px solid var(--line)}
+.about-kicker{color:#a9aa8e;font-size:10px;font-weight:700;letter-spacing:1.7px}
+.about-story h2,.meet-copy h2{margin:15px 0 0;font-size:clamp(32px,4vw,46px);line-height:1.08;letter-spacing:-1.7px;font-weight:500}
+.about-story-copy p,.meet-copy p{color:#aaa99f;font-size:13px;line-height:1.9}
+.about-story-copy p+p{margin-top:14px}
+.about-story-copy strong,.meet-copy strong{color:#e7e7dc;font-weight:600}
+.about-boundary{margin-top:22px;padding:18px 20px;border-left:2px solid var(--olive);background:#20211d;color:#c9cabe;font-size:12px;line-height:1.8}
+.meet-section{padding:74px 0;border-top:1px solid var(--line)}
+.meet-heading{margin-bottom:35px}
+.meet-heading h2{margin:15px 0 0;font-size:clamp(38px,5vw,54px);letter-spacing:-2px;font-weight:500}
+.meet-profile{display:grid;grid-template-columns:minmax(230px,.72fr) 1.28fr;gap:48px;align-items:start}
+.meet-photo-wrap{padding:10px;border:1px solid rgba(213,216,166,.2);background:#20211d}
+.meet-photo{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;object-position:center 27%;background:#5a382c}
+.meet-caption{padding:13px 3px 3px;color:#929386;font-size:9px;letter-spacing:1.2px}
+.meet-copy h3{margin:0 0 8px;font-size:25px;font-weight:600;letter-spacing:-.6px}
+.meet-role{margin-bottom:22px;color:var(--olive)!important;font-size:11px!important}
+.meet-copy p{margin-bottom:14px}
+.meet-work{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:26px}
+.meet-work article{padding:17px;border:1px solid var(--line);background:#191a17}
+.meet-work b{display:block;margin-bottom:7px;color:#e4e4da;font-size:12px}
+.meet-work p{margin:0;color:#999990;font-size:11px;line-height:1.7}
+.meet-quote{margin-top:25px;padding:20px;border:1px solid rgba(213,216,166,.2);color:#e0e0d4;font-family:"Newsreader",serif;font-size:20px;line-height:1.5}
+.meet-quote small{display:block;margin-top:9px;color:#929386;font-family:"Hanken Grotesk",sans-serif;font-size:9px;letter-spacing:1px}
+.about-closing{padding:34px;background:#20211d;border:1px solid rgba(213,216,166,.12)}
+.about-closing h2{margin:0 0 12px;font-size:28px;font-weight:500}
+.about-closing p{max-width:650px;margin:0;color:#a4a49a;font-size:12px;line-height:1.8}
+@media(max-width:700px){.about-page{padding-top:32px}.about-hero{padding-block:55px 48px}.about-hero h1{letter-spacing:-2.8px}.about-hero>p{font-size:14px}.about-story{grid-template-columns:1fr;gap:20px;padding-block:34px 52px}.meet-profile{grid-template-columns:1fr;gap:25px}.meet-photo-wrap{max-width:360px}.meet-work{grid-template-columns:1fr}.meet-section{padding-block:54px}}
+@media(max-width:560px){.header-nav{display:flex;gap:0}.header-nav a{display:none}.header-nav a[href="/about"]{display:inline-flex;padding:8px 11px;border:1px solid rgba(213,216,166,.25);font-size:11px}.header-note{display:none}.about-page{padding-bottom:65px}.about-hero h1{font-size:52px}.about-closing{padding:23px}}
