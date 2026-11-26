@@ -11,7 +11,6 @@ const size=n=>n<1048576?`${Math.max(1,Math.round(n/1024))} KB`:`${(n/1048576).to
 
 function Evidence({item}){
   const verified=item.evidenceStatus==="verified";
-  const imageRead=item.evidenceStatus==="image_read_not_text_match"||item.evidenceStatus==="native_pdf_not_text_verified";
   const showQuote=Boolean(item.quote);
   return <div className="analysis-evidence">
     {showQuote&&<blockquote>“{item.quote}”</blockquote>}
