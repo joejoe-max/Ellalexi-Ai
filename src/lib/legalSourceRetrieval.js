@@ -116,7 +116,8 @@ export async function retrieveLegalSources(query, { fetchImpl = fetch, maxDocume
       }));
       collected.push(...docs.filter(Boolean));
     } catch {
-      warnings.push("Could not retrieve the historical federal-law repository index. No legal conclusion should be drawn from unavailable sources.");
+      // Do not surface internal repository architecture to end users
+      warnings.push("Some legal reference material could not be retrieved for this review.");
     }
   }
   return {
