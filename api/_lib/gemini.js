@@ -1,4 +1,6 @@
-const DEFAULT_MODELS=["gemini-2.5-flash","gemini-2.5-flash-lite"];
+// Keep the legacy 2.5 Flash primary for projects with prior access. The 2.5 Flash-Lite
+// fallback is blocked for new users, so use currently supported Flash models instead.
+const DEFAULT_MODELS=["gemini-2.5-flash","gemini-3.5-flash-lite","gemini-3.8-flash","gemini-3.6-flash"];
 export function getModels(){const configured=(process.env.GEMINI_MODELS||"").split(",").map(x=>x.trim()).filter(Boolean);return [...new Set(configured.length?configured:DEFAULT_MODELS)].slice(0,4)}
 export function classifyProviderError(status,payload={},cause){
  const reason=String(payload?.error?.status||payload?.error?.details?.[0]?.reason||"").toUpperCase();
