@@ -8,17 +8,15 @@ import {consumeSSE} from "../lib/sse.js";
 import {loadReviewSession,saveReviewSession,clearReviewSession} from "../lib/reviewSession.js";
 
 const size=n=>n<1048576?`${Math.max(1,Math.round(n/1024))} KB`:`${(n/1048576).toFixed(1)} MB`;
-const LEGAL_PREVIEW_COUNT=2;
 
 function Evidence({item}){
   const verified=item.evidenceStatus==="verified";
-  const imageRead=item.evidenceStatus==="image_read_not_text_match"||item.evidenceStatus==="native_pdf_not_text_verified";
   const showQuote=Boolean(item.quote);
   return <div className="analysis-evidence">
     {showQuote&&<blockquote>“{item.quote}”</blockquote>}
     <small>{item.documentName}{item.page&&item.page!=="not available"?` · Page ${item.page}`:""}</small>
     {verified&&<p className="evidence-ok">Matched against the document text.</p>}
-    {!verified&&imageRead&&<p>Read from the PDF page by the AI. The selectable text layer did not match word-for-word (common with designed PDFs). Check this page in the original file if you need exact wording.</p>}
+
     {!verified&&!imageRead&&item.evidenceStatus==="not_located"&&<p>Could not automatically re-find this passage in the extracted text. Compare with the original document.</p>}
   </div>;
 }
@@ -88,8 +86,7 @@ export default function UploadPage(){
   const legalStatus=legalReview?.data?.result?.status;
   const legalIsPrinciples=legalStatus==="general_principles"||legalReview?.data?.result?.mode==="general_principles";
   const allFindings=legalReview?.data?.result?.findings||[];
-  const shownFindings=legalExpanded?allFindings:allFindings.slice(0,LEGAL_PREVIEW_COUNT);
-  const hasMoreFindings=allFindings.length>LEGAL_PREVIEW_COUNT;
+  const shownFindings=allFindings;
   const cleanLimitations=useMemo(()=>uniqueLimitations(legalReview?.data?.result?.limitations),[legalReview?.data?.result?.limitations]);
   const cleanQuestions=useMemo(()=>{
     const qs=legalReview?.data?.result?.unresolvedQuestions||[];
@@ -123,30 +120,29 @@ export default function UploadPage(){
       {legalReview?.data&&<section className="legal-review-panel">
         <div className="eyebrow">NIGERIAN LEGAL SOURCE REVIEW</div>
         <h3>{legalReview.data.result.summary||(legalIsPrinciples?"General Nigerian legal principles for this document type":legalStatus==="insufficient_sources"?"Limited legal guidance available":"Legal source review")}</h3>
-        {legalIsPrinciples&&<p>Below is guidance based on ordinary Nigerian legal principles for this kind of document. It is educational, not a formal legal opinion.</p>}
-        {legalStatus==="insufficient_sources"&&!legalIsPrinciples&&<p>EllaBrief could not retrieve a clear, citable Nigerian legal provision for the issues raised. The document explanation above still stands.</p>}
+        <button type="button" className="legal-see-more" aria-expanded={legalExpanded} onClick={()=>setLegalExpanded(v=>!v)}>
+          {legalExpanded?<><ChevronUp size={15}/> Show less</>:<><ChevronDown size={15}/> See more</>}
+        </button>
+        {legalExpanded&&<>
+                  {legalIsPrinciples&&<p>Below is guidance based on ordinary Nigerian legal principles for this kind of document. It is educational, not a formal legal opinion.</p>}
+                  {legalStatus==="insufficient_sources"&&!legalIsPrinciples&&<p>EllaBrief could not retrieve a clear, citable Nigerian legal provision for the issues raised. The document explanation above still stands.</p>}
+          
+                  <div className="legal-findings-wrap">
+                    {shownFindings.map((f,i)=><article className="legal-finding" key={i}>
+                      <b>{f.topic}</b>
+                      <p><strong>Document position:</strong> {f.documentPosition}</p>
+                      <p><strong>Legal position:</strong> {f.legalPosition}</p>
+                      <small>{f.jurisdiction}{f.effectiveStatus?` · ${String(f.effectiveStatus).replaceAll("_"," ")}`:""}{f.confidence?` · confidence: ${f.confidence}`:""}</small>
+                      {(f.citations||[]).length>0&&<div className="legal-inline-citations" aria-label="Legal sources">{f.citations.map((c,ci)=><span className="legal-citation" key={c.sourceId||ci}>[{c.authority}{c.year?`, ${c.year}`:""}{c.provisionVerified&&c.provision?`, ${c.provision}`:""}{c.publisher?`, ${c.publisher}`:""}] {c.url&&<a href={c.url} target="_blank" rel="noreferrer">View source</a>}{ci<f.citations.length-1?"; ":""}</span>)}</div>}
+                      {f.caveat&&!/not formal legal advice|educational guidance from general principles/i.test(f.caveat)&&<small>{f.caveat}</small>}
+                    </article>)}
+                  </div>
 
-        <div className={`legal-findings-wrap ${!legalExpanded&&hasMoreFindings?"is-collapsed":"is-expanded"}`}>
-          {shownFindings.map((f,i)=><article className="legal-finding" key={i}>
-            <b>{f.topic}</b>
-            <p><strong>Document position:</strong> {f.documentPosition}</p>
-            <p><strong>Legal position:</strong> {f.legalPosition}</p>
-            <small>{f.jurisdiction}{f.effectiveStatus?` · ${String(f.effectiveStatus).replaceAll("_"," ")}`:""}{f.confidence?` · confidence: ${f.confidence}`:""}</small>
-            {(f.citations||[]).length>0&&<div className="legal-inline-citations" aria-label="Legal sources">{f.citations.map((c,ci)=><span className="legal-citation" key={c.sourceId||ci}>[{c.authority}{c.year?`, ${c.year}`:""}{c.provisionVerified&&c.provision?`, ${c.provision}`:""}{c.publisher?`, ${c.publisher}`:""}] {c.url&&<a href={c.url} target="_blank" rel="noreferrer">View source</a>}{ci<f.citations.length-1?"; ":""}</span>)}</div>}
-            {f.caveat&&!/not formal legal advice|educational guidance from general principles/i.test(f.caveat)&&<small>{f.caveat}</small>}
-          </article>)}
-          {!legalExpanded&&hasMoreFindings&&<div className="legal-findings-fade" aria-hidden="true"/>}
-        </div>
-
-        {hasMoreFindings&&(
-          <button type="button" className="legal-see-more" onClick={()=>setLegalExpanded(v=>!v)}>
-            {legalExpanded?<><ChevronUp size={15}/> Show less</>:<><ChevronDown size={15}/> See more ({allFindings.length-LEGAL_PREVIEW_COUNT} more)</>}
-          </button>
-        )}
-
-        {cleanQuestions.map((q,i)=><p key={i}>• {q}</p>)}
-        {cleanLimitations.map((q,i)=><small className="legal-limitation" key={i}>{q}</small>)}
-        <p className="legal-review-disclaimer">General information only — confirm important points with a qualified Nigerian legal practitioner.</p>
+          
+                  {cleanQuestions.map((q,i)=><p key={i}>• {q}</p>)}
+                  {cleanLimitations.map((q,i)=><small className="legal-limitation" key={i}>{q}</small>)}
+                  <p className="legal-review-disclaimer">General information only — confirm important points with a qualified Nigerian legal practitioner.</p>
+        </>}
       </section>}
 
       <nav className="analysis-section-nav" aria-label="Jump to an analysis section">
