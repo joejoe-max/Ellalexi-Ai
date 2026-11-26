@@ -57,16 +57,26 @@ export async function extractPdfPages(buffer) {
     if (pdf.numPages > MAX_PDF_PAGES) {
       throw Object.assign(new Error(`PDF exceeds the ${MAX_PDF_PAGES}-page limit.`), { status: 413 });
     }
-    const pages = [];
-    for (let number = 1; number <= pdf.numPages; number += 1) {
-      const page = await pdf.getPage(number);
-      const content = await page.getTextContent();
-      const text = content.items
-        .map((item) => typeof item.str === "string" ? item.str : "")
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim();
-      pages.push({ page: number, text });
+    const pages = new Array(pdf.numPages);
+    // PDF page parsing is independent. A small concurrency window avoids
+    // serial page-by-page latency without creating 150 simultaneous PDF.js tasks.
+    const concurrency = 4;
+    for (let start = 1; start <= pdf.numPages; start += concurrency) {
+      const batch = Array.from(
+        { length: Math.min(concurrency, pdf.numPages - start + 1) },
+        (_, offset) => start + offset
+      );
+      const extracted = await Promise.all(batch.map(async number => {
+        const page = await pdf.getPage(number);
+        const content = await page.getTextContent();
+        const text = content.items
+          .map((item) => typeof item.str === "string" ? item.str : "")
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        return { page: number, text };
+      }));
+      for (const item of extracted) pages[item.page - 1] = item;
     }
     return pages;
   } finally {
