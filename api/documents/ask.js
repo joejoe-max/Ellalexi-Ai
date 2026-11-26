@@ -39,7 +39,10 @@ function clean(value){return String(value||"").replace(/[\u0000-\u0008\u000b\u00
 function isLegalQuestion(question){
   return /\b(law|legal|sue|suing|sued|court|rights?|remed(y|ies)|enforce|breach|liable|liability|statute|act\b|cama|constitution|illegal|unlawful|red ?flag|protect(ion|ed)?|damages|injunction|arbitration|dispute)\b/i.test(question);
 }
-function needsOriginalSource(question){\n  return /\\b(clause|section|article|paragraph|page|quote|quotation|exact wording|word.?for.?word|verbatim|where (?:does|is)|what (?:does|do) .{0,35} say|in the (?:original )?document|according to (?:the )?(?:document|agreement)|wording of|text of)\\b/i.test(question);\n}\nfunction isSueQuestion(question){
+function needsOriginalSource(question){
+  return /\b(clause|section|article|paragraph|page|quote|quotation|exact wording|word.?for.?word|verbatim|where (?:does|is)|what (?:does|do) .{0,35} say|in the (?:original )?document|according to (?:the )?(?:document|agreement)|wording of|text of)\b/i.test(question);
+}
+function isSueQuestion(question){
   return /\b(can i sue|could i sue|may i sue|right to sue|sue (them|him|her|the|if)|take (them|him|her) to court|legal action|enforce (the )?agreement)\b/i.test(question);
 }
 
@@ -51,7 +54,8 @@ export default async function handler(req,res){
   const {fields,files}=await parse(req);const question=clean(one(fields.question));const analysis=field(fields,"analysis");const legalReview=field(fields,"legalReview");
   if(!question.trim()||question.length>1200)throw Object.assign(new Error(),{userMessage:"Enter a question of up to 1,200 characters.",kind:"invalid_request"});
   if(!analysis||typeof analysis!=="object"||Array.isArray(analysis))throw Object.assign(new Error(),{userMessage:"The active document analysis is required.",kind:"invalid_request"});
-  const sourceRequested=needsOriginalSource(question);\n  const raw=sourceRequested?files.documents:null;const uploads=Array.isArray(raw)?raw:raw?[raw]:[];const parts=[];let total=0,inlineBytes=0,textChars=0;
+  const sourceRequested=needsOriginalSource(question);
+  const raw=sourceRequested?files.documents:null;const uploads=Array.isArray(raw)?raw:raw?[raw]:[];const parts=[];let total=0,inlineBytes=0,textChars=0;
   for(const file of uploads){
    paths.push(file.filepath);const buffer=await fs.readFile(file.filepath);buffers.push(buffer);total+=buffer.length;
    if(total>MAX_TOTAL)throw Object.assign(new Error("The source files exceed the supported combined size."),{status:413});
@@ -86,9 +90,9 @@ export default async function handler(req,res){
 
   parts.push({text:"STRUCTURED REVIEW (secondary context):\n"+context+"\n\nUSER QUESTION:\n"+question.trim()+legalHint});
   if(!uploads.length)parts.unshift({text:"No original file was attached to this follow-up. Use only the structured analysis and clearly state when the source wording cannot be checked."});
-  sendEvent(res,"status",{message:"Checking the original documents and preparing your answer…"});
-  const {text}=await generateWithFallback({systemInstruction:SYSTEM,parts,generationConfig:{temperature:0.2,maxOutputTokens:2800},timeout:60000,onFallback:()=>{}});
+  sendEvent(res,"status",{message:sourceRequested?"Checking the original wording and preparing your answer…":"Using your completed document review to prepare an answer…"});
+  const {text}=await streamWithFallback({systemInstruction:SYSTEM,parts,generationConfig:{temperature:0.2,maxOutputTokens:2800},timeout:65000,onToken:chunk=>sendEvent(res,"delta",{text:chunk}),onFallback:model=>sendEvent(res,"fallback",{model})});
   const answer=String(text||"").trim();if(!answer)throw Object.assign(new Error(),{userMessage:"The assistant returned an empty answer. Please rephrase your question.",kind:"empty_response"});
-  sendEvent(res,"delta",{text:answer});sendEvent(res,"complete",{answer});endSSE(res);
+  sendEvent(res,"complete",{answer});endSSE(res);
  }catch(error){sendSafeError(res,error);}finally{for(const buffer of buffers)buffer.fill(0);for(const path of paths){try{await fs.unlink(path);}catch{}}}
 }
