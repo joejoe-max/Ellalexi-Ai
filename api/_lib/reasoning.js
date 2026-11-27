@@ -243,7 +243,7 @@ export async function generateWithFallback({
         if (validateResponse) {
           try {
             validated = await validateResponse({ provider: candidate.provider, model: candidate.model, text, payload, finishReason: payload.choices?.[0]?.finish_reason || "stop" });
-          } catch {
+          } catch (cause) {
             lastError = Object.assign(new Error("The provider response failed application validation."), {
               kind: "invalid_response", retry: true, provider: candidate.provider,
               model: candidate.model, httpStatus: 502
@@ -251,7 +251,9 @@ export async function generateWithFallback({
             safeLog(stage, candidate.provider, candidate.model, "invalid_response", {
               ...safeCauseDetails(cause),
               ...classifyProviderPayload(payload).diagnostics,
-              validationErrorName: String(cause?.name || "Error").slice(0, 80)
+              validationErrorName: String(cause?.name || "Error").slice(0, 80),
+              validationIssueCount: Array.isArray(cause?.issues) ? cause.issues.length : null,
+              validationIssueCodes: Array.isArray(cause?.issues) ? cause.issues.slice(0, 8).map(issue => String(issue?.code || "unknown").slice(0, 40)) : []
             });
             if (attempt === 0 && jsonMode === "schema") {
               jsonMode = "object";
