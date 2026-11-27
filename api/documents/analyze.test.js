@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanJson, verifyEvidence } from "./analyze.js";
+import { cleanJson, matchSourceQuote, verifyEvidence } from "./analyze.js";
 
 const emptyAnalysis = overrides => ({
   documentOverview: "This agreement sets out the parties' obligations.",
@@ -114,6 +114,30 @@ describe("document analysis response validation", () => {
       }]
     });
     expect(() => cleanJson(JSON.stringify(wrongSource), { documentId: "doc-a", documentName: "Offer.pdf" })).toThrow(/incorrect source document ID/);
+  });
+
+
+  it("normalizes PDF line-wrap hyphenation and Unicode typography", () => {
+    expect(matchSourceQuote("The contribu-\\ntor shall receive a monthly stipend of N50,000.", "The contributor shall receive a monthly stipend of N50,000.").matched).toBe(true);
+    expect(matchSourceQuote("The Company shall pay the contributor’s fee — monthly.", "The Company shall pay the contributor's fee monthly.").matched).toBe(true);
+  });
+
+  it("does not accept paraphrases, missing words, or reordered quotations", () => {
+    expect(matchSourceQuote("The Company may pay the Contributor within thirty days.", "The Company shall pay the Contributor within thirty days.").matched).toBe(false);
+    expect(matchSourceQuote("The Contributor shall receive payment monthly.", "The Contributor shall receive payment every month.").matched).toBe(false);
+    expect(matchSourceQuote("The buyer shall pay the seller.", "The seller shall pay the buyer.").matched).toBe(false);
+  });
+
+  it("labels extraction-tolerant matches separately from exact matches", () => {
+    const analysis = emptyAnalysis({ clauses: [{
+      heading: "Compensation", documentId: "doc-offer", documentName: "Offer.pdf", page: "2",
+      quote: "The Contributor shall receive a monthly stipend of N50,000."
+    }] });
+    verifyEvidence(analysis, [{
+      documentId: "doc-offer", name: "Offer.pdf",
+      pages: [{ page: 2, text: "The Contri butor shall receive a monthly stipend of N50,000." }]
+    }]);
+    expect(analysis.clauses[0].evidenceStatus).toBe("verified_normalized");
   });
 
   it("rejects invalid enum values instead of rendering arbitrary model labels", () => {
