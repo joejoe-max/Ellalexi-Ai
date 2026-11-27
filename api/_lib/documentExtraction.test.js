@@ -17,6 +17,6 @@ describe("PDF text reconstruction",()=> {
       {str:"Company",transform:[10,0,0,10,29,100],width:45,hasEOL:true},
       {str:"shall",transform:[10,0,0,10,10,88],width:20}
     ];
-    expect(buildPdfPageText(items)).toBe("The Company\\nshall");
+    expect(buildPdfPageText(items)).toBe("The Company\nshall");
   });
 });
