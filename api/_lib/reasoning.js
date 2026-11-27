@@ -112,7 +112,7 @@ function actualTokens(payload, fallback) {
 
 export async function generateWithFallback({
   stage, parts = [], systemInstruction, generationConfig = {}, timeout = 45000,
-  deadlineAt, onFallback, fetchImpl = fetch
+  deadlineAt, onFallback, fetchImpl = fetch, validateResponse
 } = {}) {
   if (Number.isFinite(deadlineAt) && deadlineAt <= Date.now()) {
     throw Object.assign(new Error("The shared processing deadline has expired."), { kind: "processing_deadline", httpStatus: 503 });
@@ -179,11 +179,26 @@ export async function generateWithFallback({
           break;
         }
         const text = parseContent(payload);
+        let validated;
+        if (validateResponse) {
+          try {
+            validated = await validateResponse({ provider: candidate.provider, model: candidate.model, text, payload, finishReason: payload.choices?.[0]?.finish_reason || "stop" });
+          } catch (cause) {
+            lastError = Object.assign(new Error("The provider response failed application validation."), {
+              kind: "invalid_response", retry: true, provider: candidate.provider,
+              model: candidate.model, httpStatus: 502
+            });
+            safeLog(stage, candidate.provider, candidate.model, "invalid_response");
+            if (budget.reservation) releaseTokenBudget({ key: "groq", reservation: budget.reservation });
+            break;
+          }
+        }
         const usage = actualTokens(payload, estimate);
         if (budget.reservation) settleTokenBudget({ key: "groq", reservation: budget.reservation, actualTokens: usage });
         return {
           provider: candidate.provider, model: candidate.model, text, payload,
           finishReason: payload.choices?.[0]?.finish_reason || "stop",
+          ...(validateResponse ? { validated } : {}),
           fallbackTriggered
         };
       } catch (cause) {
