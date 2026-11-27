@@ -241,7 +241,7 @@ async function generateFrom(options, provider, model, formatMode) {
     throw Object.assign(providerError(502, {}, Object.assign(new Error("Invalid provider response"), { name: "EmptyResponseError" }), provider, model), { formatMode, promptTokenEstimate, completionTokenCap, budgetReservation });
   }
   const text = responseText(payload);
-  if (!text.trim()) throw Object.assign(providerError(502, {}, Object.assign(new Error("Empty response"), { name: "EmptyResponseError" }), provider, model), { formatMode, promptTokenEstimate, completionTokenCap });
+  if (!text.trim()) throw Object.assign(providerError(502, {}, Object.assign(new Error("Empty response"), { name: "EmptyResponseError" }), provider, model), { formatMode, promptTokenEstimate, completionTokenCap, budgetReservation });
   const finishReason = payload?.choices?.[0]?.finish_reason || "unknown";
   let validated;
   if (options.validateResponse) {
@@ -376,8 +376,8 @@ export function generateWithFallback(options) {
 }
 
 async function streamFrom(options, provider, model, formatMode) {
-  const { response, promptTokenEstimate, completionTokenCap } = await request({ ...options, provider, model, formatMode, stream: true });
-  if (!response.body) throw Object.assign(providerError(503, {}, null, provider, model), { formatMode, promptTokenEstimate, completionTokenCap });
+  const { response, promptTokenEstimate, completionTokenCap, budgetReservation } = await request({ ...options, provider, model, formatMode, stream: true });
+  if (!response.body) throw Object.assign(providerError(503, {}, null, provider, model), { formatMode, promptTokenEstimate, completionTokenCap, budgetReservation });
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -414,12 +414,12 @@ async function streamFrom(options, provider, model, formatMode) {
     buffer += decoder.decode();
     if (buffer.trim()) consumeFrame(buffer);
   } catch (error) {
-    if (emitted) throw Object.assign(new Error("Stream interrupted."), { kind: "stream_interrupted", retry: false, provider, model, formatMode, userMessage: "The response was interrupted. Please ask again; no partial answer was saved." });
-    throw Object.assign(error, { provider: error.provider || provider, model: error.model || model, formatMode });
+    if (emitted) throw Object.assign(new Error("Stream interrupted."), { kind: "stream_interrupted", retry: false, provider, model, formatMode, budgetReservation, userMessage: "The response was interrupted. Please ask again; no partial answer was saved." });
+    throw Object.assign(error, { provider: error.provider || provider, model: error.model || model, formatMode, budgetReservation });
   } finally {
     reader.releaseLock();
   }
-  if (!emitted.trim()) throw Object.assign(providerError(502, {}, Object.assign(new Error("Empty response"), { name: "EmptyResponseError" }), provider, model), { formatMode, promptTokenEstimate, completionTokenCap });
+  if (!emitted.trim()) throw Object.assign(providerError(502, {}, Object.assign(new Error("Empty response"), { name: "EmptyResponseError" }), provider, model), { formatMode, promptTokenEstimate, completionTokenCap, budgetReservation });
   return { provider, model, text: emitted, promptTokenEstimate, completionTokenCap, formatMode, promptTokens, completionTokens };
 }
 
