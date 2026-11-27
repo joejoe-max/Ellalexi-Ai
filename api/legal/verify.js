@@ -139,12 +139,12 @@ export default async function handler(req, res) {
     documentOverview: String(analysis.documentOverview || "").slice(0, 3000),
     executiveSummary: String(analysis.executiveSummary || "").slice(0, 3000),
     clauses: Array.isArray(analysis.clauses)
-      ? analysis.clauses.slice(0, 15).map(({ heading, plainMeaning, quote, documentName, page, benefits, burdens: _burdens, terminology }) =>
-        ({ heading, plainMeaning, quote, documentName, page, benefits, terminology }))
+      ? analysis.clauses.filter(item => item?.evidenceStatus === "verified").slice(0, 15).map(({ heading, plainMeaning, quote, documentName, documentLabel, page, benefits, burdens: _burdens, terminology }) =>
+        ({ heading, plainMeaning, quote, documentName: documentLabel || documentName, page }))
       : [],
     risks: Array.isArray(analysis.risks)
-      ? analysis.risks.slice(0, 12).map(({ title, whyItMatters, quote, documentName, page }) =>
-        ({ title, whyItMatters, quote, documentName, page }))
+      ? analysis.risks.filter(item => item?.evidenceStatus === "verified").slice(0, 12).map(({ title, whyItMatters, quote, documentName, documentLabel, page }) =>
+        ({ title, whyItMatters, quote, documentName: documentLabel || documentName, page }))
       : [],
     questions: Array.isArray(analysis.questions) ? analysis.questions.slice(0, 8) : []
   };
