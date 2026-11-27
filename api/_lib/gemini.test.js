@@ -22,6 +22,14 @@ describe("Gemini provider resilience",()=>{
   const result=await generateWithFallback({systemInstruction:"system",parts:[{text:"hello"}],generationConfig:{},onFallback:fallback});
   expect(result).toMatchObject({model:"second",text:"answer",payload:{candidates:[{content:{parts:[{text:"answer"}]}}]}});expect(fetch).toHaveBeenCalledTimes(2);expect(fallback).toHaveBeenCalledWith("second");
  });
+
+ it("does not start another Gemini model after the shared OCR deadline",async()=>{
+  vi.stubEnv("GEMINI_API_KEY","test-key");vi.stubEnv("GEMINI_MODELS","first,second");
+  const fetch=vi.fn();vi.stubGlobal("fetch",fetch);
+  await expect(generateWithFallback({parts:[{text:"scan"}],generationConfig:{},deadlineAt:Date.now()-1}))
+   .rejects.toMatchObject({kind:"processing_deadline",httpStatus:503});
+  expect(fetch).not.toHaveBeenCalled();
+ });
  it("does not retry authentication failures",async()=>{
   vi.stubEnv("GEMINI_API_KEY","test-key");vi.stubEnv("GEMINI_MODELS","first,second");
   const fetch=vi.fn().mockResolvedValue({ok:false,status:403,json:async()=>({error:{message:"secret"}})});vi.stubGlobal("fetch",fetch);
