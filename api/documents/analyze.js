@@ -125,6 +125,7 @@ export function verifyEvidence(analysis, documents) {
       if (!matches.length && !pages.length && normaliseQuote(doc.text).includes(quote)) matches.push({ page: "not available" });
       item.documentId = doc.documentId;
       item.documentName = doc.name;
+      item.documentLabel = doc.documentLabel || doc.name;
       if (!matches.length) {
         item.evidenceStatus = "unverified";
         item.evidenceNote = "The quoted wording could not be matched against the extracted source text.";
@@ -194,6 +195,9 @@ export default async function handler(req, res) {
     const uploads = Array.isArray(raw) ? raw : raw ? [raw] : [];
     if (!uploads.length) return send(res, 400, { error: "Choose at least one PDF or DOCX document." });
     const documents = [];
+    const documentIds = new Map();
+    const displayNameCounts = new Map();
+    let duplicateUploads = 0;
     let totalBytes = 0;
     for (const file of uploads) {
       paths.push(file.filepath);
@@ -206,14 +210,23 @@ export default async function handler(req, res) {
       const isDocx = type?.mime === "application/zip" && buffer.subarray(0, 2).toString() === "PK";
       if (!isPdf && !isDocx) throw Object.assign(new Error((file.originalFilename || "A file") + " is not a valid PDF or DOCX document."), { status: 400 });
       const name = String(file.originalFilename || "Uploaded document").slice(0, 180);
+      const documentId = createDocumentId({ name, size: buffer.length, buffer });
+      const existing = documentIds.get(documentId);
+      if (existing) {
+        existing.duplicateCount++;
+        duplicateUploads++;
+        continue;
+      }
+      const occurrence = (displayNameCounts.get(name) || 0) + 1;
+      displayNameCounts.set(name, occurrence);
+      const documentLabel = occurrence > 1 ? name + " (upload " + occurrence + ")" : name;
       stage = "document_extraction";
       const extracted = isPdf
         ? await preparePdfDocument(buffer, { deadlineAt, onStatus: message => sendEvent(res, "status", { message }) })
         : await extractDocxDocument(buffer);
       if (!extracted.text?.trim()) throw Object.assign(new Error("No readable text was extracted from " + name), { kind: "empty_document", httpStatus: 422, userMessage: "No readable text was found in one of the uploaded documents." });
       documents.push({
-        documentId: createDocumentId({ name, size: buffer.length, buffer }),
-        name, type: isPdf ? "PDF" : "DOCX",
+        documentId, name, documentLabel, duplicateCount: 0, type: isPdf ? "PDF" : "DOCX",
         text: extracted.text,
         pages: isPdf ? limitPages(extracted.pages) : [{ page: "not available", text: extracted.text }],
         pageCount: extracted.pageCount,
@@ -222,7 +235,9 @@ export default async function handler(req, res) {
         ocrPages: extracted.ocrPages || [],
         warnings: extracted.warnings || []
       });
+      documentIds.set(documentId, documents[documents.length - 1]);
     }
+    if (!documents.length) throw Object.assign(new Error("The selected uploads contain no unique documents to review."), { kind:"duplicate_uploads", httpStatus:400, userMessage:"All selected files were identical duplicates. Upload each distinct document once." });
 
     stage = "chunking";
     const chunks = documents.flatMap(document => chunkDocument(document, { targetTokens: 2200, overlapTokens: 180 }));
@@ -277,8 +292,9 @@ export default async function handler(req, res) {
       status: "complete",
       analysis,
       evidence: { verified: verifiedCount, unverified: unverifiedCount },
+      duplicateUploads,
       documents: documents.map(document => ({
-        name: document.name, type: document.type, status: "analysed",
+        name: document.name, label: document.documentLabel || document.name, duplicateCount: document.duplicateCount, documentId: document.documentId, type: document.type, status: "analysed",
         readingMethod: document.readingMethod, pageCount: document.pageCount,
         characterCount: document.text.length, truncated: document.truncated,
         ocrPages: document.ocrPages, warnings: document.warnings
