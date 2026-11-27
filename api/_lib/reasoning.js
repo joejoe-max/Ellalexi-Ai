@@ -252,7 +252,7 @@ export async function generateWithFallback({
               ...safeCauseDetails(cause),
               ...classifyProviderPayload(payload).diagnostics,
               validationErrorName: String(cause?.name || "Error").slice(0, 80),
-              validationErrorMessage: String(cause?.message || "Validation failed").slice(0, 180),
+              validationFailureType: cause?.name === "SyntaxError" ? "invalid_json" : "application_validation",
               validationIssueCount: Array.isArray(cause?.issues) ? cause.issues.length : null,
               validationIssueCodes: Array.isArray(cause?.issues) ? cause.issues.slice(0, 8).map(issue => String(issue?.code || "unknown").slice(0, 40)) : []
             });
