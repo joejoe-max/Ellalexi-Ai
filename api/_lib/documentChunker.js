@@ -35,7 +35,7 @@ function splitLongText(value, maxChars) {
 /**
  * Split a document into bounded evidence sections. Source text appears once in
  * its owning chunk; only an explicit bounded tail is repeated at a same-page
- * chunk boundary. Page provenance is retained for every segment.
+ * chunk boundary. Page provenance and parent document identity are retained.
  */
 export function chunkDocument(doc, options = {}) {
   const configuredTarget = Number(options.targetTokens);
@@ -51,6 +51,7 @@ export function chunkDocument(doc, options = {}) {
   const chunks = [];
   let current = [];
   let currentChars = 0;
+  const parentId = doc.documentId || doc.id || doc.name;
 
   const flush = () => {
     if (!current.length) return;
@@ -61,7 +62,7 @@ export function chunkDocument(doc, options = {}) {
       return "[Page " + item.page + "]\n" + overlap + item.text;
     }).join("\n\n");
     chunks.push({
-      documentId: doc.id || doc.name,
+      documentId: parentId,
       documentName: doc.name,
       startPage: first,
       endPage: last,
