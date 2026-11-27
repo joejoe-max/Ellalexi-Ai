@@ -16,6 +16,12 @@ function bucketFor(key, now) {
   return active;
 }
 
+export function inspectTokenBudget({ key = "groq", limit = DEFAULT_BUDGET, now = Date.now() } = {}) {
+  const active = bucketFor(key, now);
+  const used = active.reduce((sum, entry) => sum + entry.tokens, 0);
+  return { used, remaining: Math.max(0, limit - used), limit };
+}
+
 /**
  * Per-runtime sliding-window guard. Serverless instances do not share memory;
  * provider rate-limit headers and retry-after handling are still required.

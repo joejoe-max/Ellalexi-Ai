@@ -86,6 +86,7 @@ function buildQuery(analysis) {
 async function generatePrinciplesGuidance(compact, docType, onFallback) {
   const input = JSON.stringify({ documentType: docType, analysis: compact });
   const generated = await generateWithFallback({
+    stage: "legal_principles",
     systemInstruction: SYSTEM_PRINCIPLES,
     parts: [{
       text: "Provide general Nigerian legal-principle guidance for this " + docType + ". Tie each finding to issues in the analysis. Do not invent section numbers.\n\n" + input
@@ -210,6 +211,7 @@ export default async function handler(req, res) {
 
     sendEvent(res, "status", { message: "Comparing retrieved source passages with the document…" });
     const generated = await generateWithFallback({
+      stage: "legal_verification",
       systemInstruction: SYSTEM_VERIFIED,
       parts: [{
         text: "Compare the document issues with the retrieved Nigerian legal source excerpts. The document appears to be a " + docType + ". Use sourceIds exactly as supplied.\n\n" + input

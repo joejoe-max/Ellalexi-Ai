@@ -83,7 +83,7 @@ export default async function handler(req,res){
   parts.push({text:"STRUCTURED REVIEW (secondary context):\n"+context+"\n\nUSER QUESTION:\n"+question.trim()+legalHint});
   if(!uploads.length)parts.unshift({text:"No original file was attached to this follow-up. Use only the structured analysis and clearly state when the source wording cannot be checked."});
   sendEvent(res,"status",{message:sourceRequested?"Checking the original wording and preparing your answer…":"Using your completed document review to prepare an answer…"});
-  const {text}=await streamWithFallback({systemInstruction:SYSTEM,parts,generationConfig:{temperature:0.2,maxOutputTokens:1200},timeout:65000,onToken:chunk=>sendEvent(res,"delta",{text:chunk}),onFallback:()=>sendEvent(res,"fallback",{message:"Trying another AI service…"})});
+  const {text}=await streamWithFallback({stage:"follow_up",systemInstruction:SYSTEM,parts,generationConfig:{temperature:0.2,maxOutputTokens:1200},timeout:65000,onToken:chunk=>sendEvent(res,"delta",{text:chunk}),onFallback:()=>sendEvent(res,"fallback",{message:"Trying another AI service…"})});
   const answer=String(text||"").trim();if(!answer)throw Object.assign(new Error(),{userMessage:"The assistant returned an empty answer. Please rephrase your question.",kind:"empty_response"});
   sendEvent(res,"complete",{answer});endSSE(res);
  }catch(error){sendSafeError(res,error);}finally{for(const buffer of buffers)buffer.fill(0);for(const path of paths){try{await fs.unlink(path);}catch{ /* Ignore malformed optional fields; validation below returns a safe error. */ }}}

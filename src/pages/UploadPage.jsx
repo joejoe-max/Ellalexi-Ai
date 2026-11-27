@@ -7,6 +7,10 @@ import AnalysisTools from "../components/AnalysisTools.jsx";
 import {consumeSSE} from "../lib/sse.js";
 import {loadReviewSession,saveReviewSession,clearReviewSession} from "../lib/reviewSession.js";
 
+function readingSummary(doc){
+  const method=doc.readingMethod==="gemini_ocr"?"Scanned pages read with OCR":doc.readingMethod==="tesseract_ocr"?"Scanned pages read with local OCR":doc.readingMethod==="mammoth_text"?"Text extracted from DOCX":doc.readingMethod==="pdf_text"?"Selectable text extracted":"Text extracted";
+  return doc.truncated?`${method}; extraction limit reached`:method;
+}
 const size=n=>n<1048576?`${Math.max(1,Math.round(n/1024))} KB`:`${(n/1048576).toFixed(1)} MB`;
 
 function Evidence({item}){
@@ -157,7 +161,7 @@ export default function UploadPage(){
         <div className="eyebrow">IN SIMPLE TERMS</div>
         <h3>{analysis.documentOverview}</h3>
         <p>{analysis.executiveSummary}</p>
-        {result.documents?.length>0&&<div className="workspace-documents"><b>Documents included</b>{result.documents.map((doc,i)=><div className="workspace-document" key={`${doc.name}-${i}`}><FileText size={15}/><span>{doc.name}<small>{doc.type} · {doc.pageCount?`${doc.pageCount} pages`:"Page count unavailable"} · {doc.readingMethod==="gemini_native_pdf"?"Read directly from PDF pages":doc.truncated?"Text limit reached":"Text extracted"}</small></span></div>)}</div>}
+        {result.documents?.length>0&&<div className="workspace-documents"><b>Documents included</b>{result.documents.map((doc,i)=><div className="workspace-document" key={`${doc.name}-${i}`}><FileText size={15}/><span>{doc.name}<small>{doc.type} · {doc.pageCount?`${doc.pageCount} pages`:"Page count unavailable"} · {readingSummary(doc)}</small></span></div>)}</div>}
       </section>
 
       <ListSection id="people" title="People and organisations" items={analysis.parties} render={x=><><b>{x.name}</b><p>{x.role}</p><small>{x.source}</small></>}/>
