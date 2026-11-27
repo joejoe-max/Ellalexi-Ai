@@ -5,7 +5,7 @@ import {streamWithFallback} from "../_lib/reasoning.js";
 import {preparePdfDocument,extractDocxDocument} from "../_lib/documentExtraction.js";
 import {retrieveStructuredEvidence,retrieveSourcePassages} from "../_lib/documentRetrieval.js";
 import {startSSE,sendEvent,endSSE,sendSafeError} from "../_lib/sse.js";
-export const config={api:{bodyParser:false}};
+export const config={api:{bodyParser:false},maxDuration:60};
 const MAX_FILES=5,MAX_FILE=10*1024*1024,MAX_TOTAL=25*1024*1024;
 
 const SYSTEM = `You are EllaBrief, a Nigerian legal-document explanation assistant. Help ordinary people understand what they are being asked to sign — what the document says and how that sits against ordinary Nigerian legal principles.
