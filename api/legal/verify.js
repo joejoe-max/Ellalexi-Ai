@@ -246,8 +246,8 @@ export default async function handler(req, res) {
     const sourceById = new Map(sources.map(s => [s.id, s]));
 
     result.findings = result.findings.flatMap(f => {
-      if (!Array.isArray(f.sourceIds) || !f.sourceIds.length) return [];
-      const citations = f.sourceIds.map(id => sourceById.get(id)).filter(Boolean).map(source => {
+      if (!Array.isArray(f.sourceIds) || !f.sourceIds.length || f.sourceIds.some(id => !Number.isInteger(id) || !sourceById.has(id))) return [];
+      const citations = [...new Set(f.sourceIds)].map(id => sourceById.get(id)).map(source => {
         const provision = String(f.provision || "").trim();
         const sectionMatch = provision.match(/(?:section|s\.)\s*([0-9]+[A-Za-z]?(?:\([0-9A-Za-z]+\))*)/i);
         const sectionNumber = sectionMatch?.[1]?.toLowerCase();
