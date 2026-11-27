@@ -6,9 +6,7 @@ const DEFAULT_OUTPUT_TOKENS = 1000;
 const unique = values => [...new Set(values.filter(Boolean))];
 
 export function getGroqReasoningModels() {
-  const configured = String(process.env.GROQ_REASONING_MODELS || "")
-    .split(",").map(value => value.trim()).filter(Boolean);
-  return unique(configured.length ? configured : DEFAULT_GROQ_MODELS).slice(0, 4);
+  return [...DEFAULT_GROQ_MODELS];
 }
 export function getOpenRouterModels() { return [OPENROUTER_MODEL]; }
 export function getOpenRouterModel() { return OPENROUTER_MODEL; }
