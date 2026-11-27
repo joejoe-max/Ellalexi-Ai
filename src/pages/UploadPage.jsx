@@ -16,18 +16,18 @@ const size=n=>n<1048576?`${Math.max(1,Math.round(n/1024))} KB`:`${(n/1048576).to
 function Evidence({item}){
   const status=item.evidenceStatus||"missing_evidence";
   const messages={
-    unverified:"This quotation could not be matched to the extracted source text. Check the original document.",
+    unverified:item.evidenceNote||"This quotation could not be matched to the extracted source text. Check the original document.",
     missing_evidence:"No usable source quotation was supplied. This finding is not evidence-verified.",
     ambiguous_source:"The source reference does not uniquely identify one uploaded document.",
     ambiguous_page:"The quotation appears on multiple pages and its cited page is ambiguous.",
     page_mismatch:`The quotation was found on page ${item.matchedPage}, not the cited page ${item.page}. It is not marked verified.`
   };
-  const verified=status==="verified";
+  const verified=status==="verified"||status==="verified_normalized";
   return <div className="analysis-evidence">
     {item.quote&&<blockquote>“{item.quote}”</blockquote>}
     <small>{item.documentLabel||item.documentName}{item.page&&item.page!=="not available"?` · Page ${item.page}`:""}</small>
     {verified
-      ? <p className="evidence-ok" role="status">Matched against the identified document and page.</p>
+      ? <p className="evidence-ok" role="status">{status==="verified_normalized"?"Matched after normalizing PDF text extraction formatting.":"Matched against the identified document and page."}</p>
       : <p className="evidence-warning" role="note">{messages[status]||"This finding has not been verified against a unique source passage."}</p>}
   </div>;
 }
