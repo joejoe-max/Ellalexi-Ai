@@ -4,7 +4,7 @@ describe("Gemini provider resilience",()=>{
  afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals()});
  it("uses supported Flash defaults and allows explicit model order",()=>{
   vi.stubEnv("GEMINI_MODELS","");
-  expect(getModels()).toEqual(["gemini-3.8-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite"]);
+  expect(getModels()).toEqual(["gemini-3.1-flash-lite","gemini-3.5-flash-lite","gemini-3.8-flash"]);
   vi.stubEnv("GEMINI_MODELS","model-a, model-b,model-a");
   expect(getModels()).toEqual(["model-a","model-b"]);
  });
@@ -21,6 +21,14 @@ describe("Gemini provider resilience",()=>{
   const fallback=vi.fn();
   const result=await generateWithFallback({systemInstruction:"system",parts:[{text:"hello"}],generationConfig:{},onFallback:fallback});
   expect(result).toMatchObject({model:"second",text:"answer",payload:{candidates:[{content:{parts:[{text:"answer"}]}}]}});expect(fetch).toHaveBeenCalledTimes(2);expect(fallback).toHaveBeenCalledWith("second");
+ });
+
+ it("does not start another Gemini model after the shared OCR deadline",async()=>{
+  vi.stubEnv("GEMINI_API_KEY","test-key");vi.stubEnv("GEMINI_MODELS","first,second");
+  const fetch=vi.fn();vi.stubGlobal("fetch",fetch);
+  await expect(generateWithFallback({parts:[{text:"scan"}],generationConfig:{},deadlineAt:Date.now()-1}))
+   .rejects.toMatchObject({kind:"processing_deadline",httpStatus:503});
+  expect(fetch).not.toHaveBeenCalled();
  });
  it("does not retry authentication failures",async()=>{
   vi.stubEnv("GEMINI_API_KEY","test-key");vi.stubEnv("GEMINI_MODELS","first,second");

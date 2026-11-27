@@ -1,5 +1,8 @@
 import { searchLiveLegalSources } from "../../src/lib/liveLegalSearch.js";
-import {generateWithFallback} from "../_lib/gemini.js";
+import {generateWithFallback} from "../_lib/reasoning.js";
+import {retrieveLegalSources} from "../../src/lib/legalSourceRetrieval.js";
+import {buildLegalReviewContext} from "../_lib/legalReviewContext.js";
+import {enforceLegalCurrentness} from "../_lib/legalSourceValidation.js";
 import {startSSE,sendEvent,endSSE,sendSafeError} from "../_lib/sse.js";
 
 const SCHEMA = { type:"OBJECT", properties:{
@@ -14,13 +17,13 @@ const SCHEMA = { type:"OBJECT", properties:{
   unresolvedQuestions:{type:"ARRAY",items:{type:"STRING"}},limitations:{type:"ARRAY",items:{type:"STRING"}}
 },required:["status","summary","findings","unresolvedQuestions","limitations"]};
 
-const SYSTEM_VERIFIED = "You are EllaBrief AI's Nigerian legal-source comparison component. Use ONLY supplied retrieved excerpts as evidence. Never invent Acts, sections, cases, dates, quotations or legal rules that are not supported by the excerpts. Distinguish document text from source text. Distinguish enacted laws from bills and news. Do not say currentness is verified unless retrieved source text establishes legal effect and date. Every finding must cite sourceIds that support it. Never advise signing or not signing.";
+const SYSTEM_VERIFIED = "You are EllaBrief AI's Nigerian legal-source comparison component. Use ONLY supplied retrieved excerpts as legal evidence. The document overview and executive summary are navigation hints only; only clauses and risks with verified source quotations are grounded in the uploaded document. Historical repository copies are not proof of current law and cannot establish currentness. Never invent Acts, sections, cases, dates, quotations or legal rules that are not supported by the excerpts. Distinguish document text from source text. Distinguish enacted laws from bills and news. Do not say currentness is verified unless retrieved source text establishes legal effect and date. Every finding must cite sourceIds that support it. Never advise signing or not signing.";
 
 const SYSTEM_PRINCIPLES = `You are EllaBrief AI's Nigerian legal-education component for document reviews.
 A live primary-source page could not be retrieved. Your job is still to help the user understand how ordinary Nigerian legal principles typically relate to THIS document.
 
 Rules:
-- Base documentPosition strictly on the supplied analysis (what the document says).
+- Base documentPosition strictly on source-verified clauses and risks supplied in the analysis. The overview and executive summary are model-generated navigation hints only, not verified contract evidence; do not present their uncorroborated details as document facts.
 - legalPosition must explain general Nigerian principles relevant to that point (contract, companies/CAMA-style concepts for contributor/startup/equity offers, IP assignment, confidentiality, dispute resolution, limitation of liability, etc.).
 - Do NOT invent specific section numbers, gazette dates, or case names.
 - Set effectiveStatus to "general_principle", confidence to "moderate" or "low", sourceIds to [], authority to "General Nigerian legal principles (not a verified statutory citation)", provision to "General principle — not a verified section citation".
@@ -85,12 +88,13 @@ function buildQuery(analysis) {
 async function generatePrinciplesGuidance(compact, docType, onFallback) {
   const input = JSON.stringify({ documentType: docType, analysis: compact });
   const generated = await generateWithFallback({
+    stage: "legal_principles",
     systemInstruction: SYSTEM_PRINCIPLES,
     parts: [{
       text: "Provide general Nigerian legal-principle guidance for this " + docType + ". Tie each finding to issues in the analysis. Do not invent section numbers.\n\n" + input
     }],
     generationConfig: { temperature: 0.25, maxOutputTokens: 5000, responseMimeType: "application/json", responseSchema: SCHEMA },
-    timeout: 75000,
+    timeout: 35000,
     onFallback
   });
   let result;
@@ -119,6 +123,8 @@ async function generatePrinciplesGuidance(compact, docType, onFallback) {
   return { result, model: generated.model };
 }
 
+export const config = { maxDuration: 60 };
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -126,38 +132,19 @@ export default async function handler(req, res) {
   }
   startSSE(res);
   sendEvent(res, "status", { message: "Identifying the document type and retrieving relevant Nigerian legal sources…" });
-  if (!process.env.GEMINI_API_KEY) {
-    sendSafeError(res, Object.assign(new Error(), {
-      userMessage: "Legal-source review is not configured yet. Please try again later.",
-      kind: "configuration"
-    }));
-    return;
-  }
   const { analysis, jurisdiction = "Nigeria" } = req.body || {};
   if (!analysis || typeof analysis !== "object" || Array.isArray(analysis)) {
     return send(res, 400, { error: "A document analysis object is required." });
   }
 
-  const compact = {
-    documentOverview: String(analysis.documentOverview || "").slice(0, 3000),
-    executiveSummary: String(analysis.executiveSummary || "").slice(0, 3000),
-    clauses: Array.isArray(analysis.clauses)
-      ? analysis.clauses.slice(0, 15).map(({ heading, plainMeaning, quote, documentName, page, benefits, burdens: _burdens, terminology }) =>
-        ({ heading, plainMeaning, quote, documentName, page, benefits, terminology }))
-      : [],
-    risks: Array.isArray(analysis.risks)
-      ? analysis.risks.slice(0, 12).map(({ title, whyItMatters, quote, documentName, page }) =>
-        ({ title, whyItMatters, quote, documentName, page }))
-      : [],
-    questions: Array.isArray(analysis.questions) ? analysis.questions.slice(0, 8) : []
-  };
+  const compact = buildLegalReviewContext(analysis);
 
   try {
     const docType = inferDocumentType(compact);
     const query = buildQuery(compact);
-    const live = await searchLiveLegalSources(query, { apiKey: process.env.GEMINI_API_KEY });
-    const combined = live.sources.slice(0, 6);
-    const warnings = [...(live.warnings || [])].filter(w =>
+    const [live,historical]=await Promise.all([searchLiveLegalSources(query),retrieveLegalSources(query).catch(()=>({sources:[],warnings:["Historical legal reference material could not be retrieved."]}))]);
+    const combined=[...live.sources,...historical.sources.map(source=>({...source,authority:"historical_repository",status:source.status||"Historical repository copy; currentness and legal effect are not verified."}))].filter((source,index,all)=>all.findIndex(item=>item.url===source.url)===index).slice(0,6);
+    const warnings = [...(live.warnings || []), ...(historical.warnings || [])].filter(w =>
       !/local repository|historical fallback|local source index/i.test(w)
     );
 
@@ -169,18 +156,17 @@ export default async function handler(req, res) {
       if (principles) {
         return send(res, 200, {
           ok: true,
-          model: principles.model,
+          
           result: principles.result,
           sources: [],
           sourceCatalog: [],
           warnings,
-          search: { liveAttempted: live.searched, liveSources: 0, documentType: docType, mode: "general_principles" },
+          search: { liveAttempted: live.searched, liveSources: 0, historicalSources: historical.sources.length, documentType: docType, mode: "general_principles" },
           notice: "Educational legal information based on general Nigerian principles, not formal advice. Confirm important points with a qualified Nigerian legal practitioner."
         });
       }
       return send(res, 200, {
         ok: true,
-        model: null,
         result: {
           status: "insufficient_sources",
           summary: "Limited legal guidance could be prepared for this " + docType + ".",
@@ -215,20 +201,35 @@ export default async function handler(req, res) {
 
     sendEvent(res, "status", { message: "Comparing retrieved source passages with the document…" });
     const generated = await generateWithFallback({
+      stage: "legal_verification",
       systemInstruction: SYSTEM_VERIFIED,
       parts: [{
         text: "Compare the document issues with the retrieved Nigerian legal source excerpts. The document appears to be a " + docType + ". Use sourceIds exactly as supplied.\n\n" + input
       }],
       generationConfig: { temperature: 0.1, maxOutputTokens: 6000, responseMimeType: "application/json", responseSchema: SCHEMA },
-      timeout: 90000,
+      timeout: 45000,
       onFallback: () => sendEvent(res, "fallback", { message: "Trying another AI model…" })
     });
 
     let result;
-    try { result = JSON.parse(generated.text); }
-    catch { return send(res, 502, { error: "The legal-source service returned an unreadable result." }); }
-    if (!Array.isArray(result.findings) || !Array.isArray(result.limitations)) {
-      return send(res, 502, { error: "The legal-source result did not match the expected structure." });
+    try {
+      result = JSON.parse(String(generated.text || "").trim().replace(/^\x60\x60\x60(?:json)?\s*/i, "").replace(/\s*\x60\x60\x60$/, ""));
+      if (result?.result && typeof result.result === "object" && !Array.isArray(result.result)) result = result.result;
+      if (result?.analysis && typeof result.analysis === "object" && !Array.isArray(result.analysis)) result = result.analysis;
+    } catch {
+      return send(res, 502, { error: "The legal-source service returned an unreadable result." });
+    }
+    // Models occasionally omit optional arrays or wrap the object. Normalise
+    // those harmless shape variations, but never fabricate legal findings.
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
+      return send(res, 502, { error: "The legal-source service returned an invalid result." });
+    }
+    result.findings = Array.isArray(result.findings) ? result.findings : [];
+    result.limitations = Array.isArray(result.limitations) ? result.limitations : [];
+    result.unresolvedQuestions = Array.isArray(result.unresolvedQuestions) ? result.unresolvedQuestions : [];
+    result.summary = typeof result.summary === "string" ? result.summary : "Legal source review completed with limited structured findings.";
+    if (!["verified_sources_found", "insufficient_sources", "conflicting_sources", "general_principles"].includes(result.status)) {
+      result.status = result.findings.length ? "verified_sources_found" : "insufficient_sources";
     }
 
     const sources = combined.map((source, index) => ({
@@ -245,8 +246,8 @@ export default async function handler(req, res) {
     const sourceById = new Map(sources.map(s => [s.id, s]));
 
     result.findings = result.findings.flatMap(f => {
-      if (!Array.isArray(f.sourceIds) || !f.sourceIds.length) return [];
-      const citations = f.sourceIds.map(id => sourceById.get(id)).filter(Boolean).map(source => {
+      if (!Array.isArray(f.sourceIds) || !f.sourceIds.length || f.sourceIds.some(id => !Number.isInteger(id) || !sourceById.has(id))) return [];
+      const citations = [...new Set(f.sourceIds)].map(id => sourceById.get(id)).map(source => {
         const provision = String(f.provision || "").trim();
         const sectionMatch = provision.match(/(?:section|s\.)\s*([0-9]+[A-Za-z]?(?:\([0-9A-Za-z]+\))*)/i);
         const sectionNumber = sectionMatch?.[1]?.toLowerCase();
@@ -265,11 +266,13 @@ export default async function handler(req, res) {
           url: source.uri,
           provisionVerified,
           sourceStatus: source.status,
-          sourceAuthority: source.authority
+          sourceAuthority: source.authority,
+          currentnessVerified: source.currentnessVerified === true
         };
       }).filter(Boolean);
       return citations.length ? [{ ...f, citations }] : [];
     });
+    enforceLegalCurrentness(result);
 
     if (!result.findings.length) {
       sendEvent(res, "status", { message: "Preparing general legal principles for this document type…" });
@@ -279,12 +282,11 @@ export default async function handler(req, res) {
       if (principles) {
         return send(res, 200, {
           ok: true,
-          model: principles.model,
           result: principles.result,
           sources: [],
           sourceCatalog: [],
           warnings,
-          search: { liveAttempted: live.searched, liveSources: live.sources.length, documentType: docType, mode: "general_principles" },
+          search: { liveAttempted: live.searched, liveSources: live.sources.length, historicalSources: historical.sources.length, documentType: docType, mode: "general_principles" },
           notice: "Educational legal information based on general Nigerian principles, not formal advice. Confirm important points with a qualified Nigerian legal practitioner."
         });
       }
@@ -295,12 +297,12 @@ export default async function handler(req, res) {
 
     return send(res, 200, {
       ok: true,
-      model: generated.model,
+      
       result,
       sources,
       sourceCatalog: [],
       warnings,
-      search: { liveAttempted: live.searched, liveSources: live.sources.length, documentType: docType },
+      search: { liveAttempted: live.searched, liveSources: live.sources.length, historicalSources: historical.sources.length, documentType: docType },
       notice: "Source-assisted legal information, not legal advice. Check the cited material and seek a qualified Nigerian legal practitioner for important decisions."
     });
   } catch (error) {

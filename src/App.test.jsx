@@ -19,7 +19,7 @@ describe("EllaBrief application foundation", () => {
     render(<MemoryRouter initialEntries={["/about"]}><App /></MemoryRouter>);
     expect(screen.getByRole("heading", { name: /meet ella/i })).toBeInTheDocument();
     expect(screen.getByText(/startup agreement/i)).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /portrait of ella itoro gabby/i })).toHaveAttribute("src", "/ella-itoro-gabby.jpg");
+    expect(screen.getByRole("img", { name: /portrait of ella itoro gabby/i })).toHaveAttribute("src", "/FB_IMG_17956838197394767.jpg");
   });
 
   it("provides a useful not-found page for unknown routes", () => {

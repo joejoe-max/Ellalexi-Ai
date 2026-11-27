@@ -1,6 +1,6 @@
 // Prefer currently supported Gemini Flash models. Override order with GEMINI_MODELS if needed.
-const DEFAULT_MODELS=["gemini-3.8-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite"];
-export function getModels(){const configured=(process.env.GEMINI_MODELS||"").split(",").map(x=>x.trim()).filter(Boolean);return [...new Set(configured.length?configured:DEFAULT_MODELS)].slice(0,4)}
+const DEFAULT_MODELS=["gemini-3.1-flash-lite","gemini-3.5-flash-lite","gemini-3.8-flash"];
+export function getModels(){const configured=(process.env.GEMINI_OCR_MODELS||process.env.GEMINI_MODELS||"").split(",").map(x=>x.trim()).filter(Boolean);return [...new Set(configured.length?configured:DEFAULT_MODELS)].slice(0,4)}
 export function classifyProviderError(status,payload={},cause){
  const reason=String(payload?.error?.status||payload?.error?.details?.[0]?.reason||"").toUpperCase();
  if(cause?.name==="TimeoutError"||cause?.name==="AbortError")return {kind:"timeout",retry:true,httpStatus:504,message:"The AI request took too long. Please try again."};
@@ -12,14 +12,17 @@ export function classifyProviderError(status,payload={},cause){
  if(status===400)return {kind:"invalid_request",retry:false,httpStatus:422,message:"This request could not be processed. Check the uploaded content and try again."};
  return {kind:"provider_error",retry:false,httpStatus:502,message:"EllaBrief could not complete this request. Please try again."};
 }
-export async function generateWithFallback({parts,systemInstruction,generationConfig,tools,timeout=90000,onFallback,fetchImpl=fetch,allowEmptyText=false,apiKey:suppliedApiKey,validateResponse}){
+export async function generateWithFallback({parts,systemInstruction,generationConfig,tools,timeout=90000,deadlineAt,onFallback,fetchImpl=fetch,allowEmptyText=false,apiKey:suppliedApiKey,validateResponse}){
  const key=suppliedApiKey||process.env.GEMINI_API_KEY;
  if(!key)throw Object.assign(new Error("AI is not configured."),{kind:"configuration",httpStatus:503,userMessage:"EllaBrief's AI service is not configured yet. Please try again later."});
  const models=getModels();let last;
  for(let i=0;i<models.length;i++){
   const model=models[i];
+  const remaining=Number.isFinite(deadlineAt)?deadlineAt-Date.now():Infinity;
+  if(remaining<=0)throw Object.assign(new Error("The OCR request reached its processing deadline."),{kind:"processing_deadline",httpStatus:503,userMessage:"The scanned pages need more processing time. Upload a clearer or text-based PDF and try again.",model});
+  const requestTimeout=Number.isFinite(remaining)?Math.max(1,Math.min(timeout,remaining)):timeout;
   try{
-   const response=await fetchImpl("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({...(systemInstruction?{systemInstruction:{parts:[{text:systemInstruction}]}}:{}),contents:[{role:"user",parts}],generationConfig,...(tools?{tools}:{})}),signal:AbortSignal.timeout(timeout)});
+   const response=await fetchImpl("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({...(systemInstruction?{systemInstruction:{parts:[{text:systemInstruction}]}}:{}),contents:[{role:"user",parts}],generationConfig,...(tools?{tools}:{})}),signal:AbortSignal.timeout(requestTimeout)});
    if(!response.ok){const payload=await response.json().catch(()=>({}));const err=classifyProviderError(response.status,payload);const providerMessage=String(payload?.error?.message||"").slice(0,180);last=Object.assign(new Error(err.message),{...err,userMessage:err.message,model,providerStatus:response.status,providerCode:String(payload?.error?.status||payload?.error?.code||"").slice(0,80),providerMessage});if(!err.retry||i===models.length-1)break;onFallback?.(models[i+1]);continue;}
    const payload=await response.json();const text=payload.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("");
    if(!text&&!allowEmptyText)throw Object.assign(new Error("Empty model response"),{kind:"empty_response",retry:true,httpStatus:502,userMessage:"The AI service returned an incomplete response. Please try again.",responseLength:0,finishReason:payload.candidates?.[0]?.finishReason||"UNKNOWN"});

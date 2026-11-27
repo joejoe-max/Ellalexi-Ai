@@ -7,17 +7,28 @@ import AnalysisTools from "../components/AnalysisTools.jsx";
 import {consumeSSE} from "../lib/sse.js";
 import {loadReviewSession,saveReviewSession,clearReviewSession} from "../lib/reviewSession.js";
 
+function readingSummary(doc){
+  const method=doc.readingMethod==="gemini_ocr"?"Scanned pages read with OCR":doc.readingMethod==="tesseract_ocr"?"Scanned pages read with local OCR":doc.readingMethod==="mammoth_text"?"Text extracted from DOCX":doc.readingMethod==="pdf_text"?"Selectable text extracted":"Text extracted";
+  return doc.truncated?`${method}; extraction limit reached`:method;
+}
 const size=n=>n<1048576?`${Math.max(1,Math.round(n/1024))} KB`:`${(n/1048576).toFixed(1)} MB`;
 
 function Evidence({item}){
-  const verified=item.evidenceStatus==="verified";
-  const showQuote=Boolean(item.quote);
+  const status=item.evidenceStatus||"missing_evidence";
+  const messages={
+    unverified:item.evidenceNote||"This quotation could not be matched to the extracted source text. Check the original document.",
+    missing_evidence:"No usable source quotation was supplied. This finding is not evidence-verified.",
+    ambiguous_source:"The source reference does not uniquely identify one uploaded document.",
+    ambiguous_page:"The quotation appears on multiple pages and its cited page is ambiguous.",
+    page_mismatch:`The quotation was found on page ${item.matchedPage}, not the cited page ${item.page}. It is not marked verified.`
+  };
+  const verified=status==="verified"||status==="verified_normalized";
   return <div className="analysis-evidence">
-    {showQuote&&<blockquote>“{item.quote}”</blockquote>}
-    <small>{item.documentName}{item.page&&item.page!=="not available"?` · Page ${item.page}`:""}</small>
-    {verified&&<p className="evidence-ok">Matched against the document text.</p>}
-
-    {!verified&&item.evidenceStatus==="not_located"&&<p>Could not automatically re-find this passage in the extracted text. Compare with the original document.</p>}
+    {item.quote&&<blockquote>“{item.quote}”</blockquote>}
+    <small>{item.documentLabel||item.documentName}{item.page&&item.page!=="not available"?` · Page ${item.page}`:""}</small>
+    {verified
+      ? <p className="evidence-ok" role="status">{status==="verified_normalized"?"Matched after normalizing PDF text extraction formatting.":"Matched against the identified document and page."}</p>
+      : <p className="evidence-warning" role="note">{messages[status]||"This finding has not been verified against a unique source passage."}</p>}
   </div>;
 }
 
@@ -155,9 +166,9 @@ export default function UploadPage(){
 
       <section className="analysis-summary" id="analysis-overview">
         <div className="eyebrow">IN SIMPLE TERMS</div>
-        <h3>{analysis.documentOverview}</h3>
-        <p>{analysis.executiveSummary}</p>
-        {result.documents?.length>0&&<div className="workspace-documents"><b>Documents included</b>{result.documents.map((doc,i)=><div className="workspace-document" key={`${doc.name}-${i}`}><FileText size={15}/><span>{doc.name}<small>{doc.type} · {doc.pageCount?`${doc.pageCount} pages`:"Page count unavailable"} · {doc.readingMethod==="gemini_native_pdf"?"Read directly from PDF pages":doc.truncated?"Text limit reached":"Text extracted"}</small></span></div>)}</div>}
+        <h3 style={{whiteSpace:"pre-line"}}>{analysis.documentOverview}</h3>
+        <p style={{whiteSpace:"pre-line"}}>{analysis.executiveSummary}</p>
+        {result.documents?.length>0&&<div className="workspace-documents"><b>Documents included</b>{result.documents.map((doc,i)=><div className="workspace-document" key={`${doc.name}-${i}`}><FileText size={15}/><span>{doc.label||doc.name}<small>{doc.type} · {doc.pageCount?`${doc.pageCount} pages`:"Page count unavailable"} · {readingSummary(doc)}{doc.duplicateCount?` · ${doc.duplicateCount} identical duplicate upload${doc.duplicateCount===1?"":"s"} ignored`:""}</small></span></div>)}</div>}
       </section>
 
       <ListSection id="people" title="People and organisations" items={analysis.parties} render={x=><><b>{x.name}</b><p>{x.role}</p><small>{x.source}</small></>}/>
@@ -167,7 +178,7 @@ export default function UploadPage(){
       <ListSection id="money" title="Money and financial terms" items={analysis.moneyMatters} render={x=><><b>{x.item}</b><p>{x.amount} · {x.frequency}</p><p>{x.notes}</p><Evidence item={x}/></>}/>
       <ListSection id="protections" title="Protections to consider" items={analysis.missingProtections} render={x=><><b>{x.protection}</b><p>{x.whyItMatters}</p><small>{x.scope}</small></>}/>
       <ListSection id="questions" title="Questions worth asking" items={analysis.questions} render={x=><><b>{x.question}</b><p>{x.reason}</p><small>{x.documentName}{x.page&&x.page!=="not available"?` · Page ${x.page}`:""}</small></>}/>
-      <ListSection id="cross-documents" title="Across your documents" items={analysis.crossDocumentFindings} render={x=><><b>{x.finding}</b><p>{x.significance}</p><small>{x.documents.join(" · ")}</small></>}/>
+      <ListSection id="cross-documents" title="Across your documents" items={analysis.crossDocumentFindings} render={x=><><b>{x.finding}</b><p>{x.significance}</p><small>{x.documents.join(" · ")}</small>{x.evidence?.length>0&&<details className="cross-document-evidence"><summary>View source passages</summary>{x.evidence.map((e,i)=><blockquote key={e.documentName+i}>“{e.quote}”<small>{e.documentName}{e.page&&e.page!=="not available"?` · Page ${e.page}`:""}</small></blockquote>)}</details>}</>}/>
       <ListSection id="limitations" title="Limitations" items={analysis.limitations} render={x=><p>{x}</p>}/>
 
       <AnalysisTools analysis={analysis} documents={result.documents||[]} legalReview={legalReview?.data?.result||null} files={files}/>
