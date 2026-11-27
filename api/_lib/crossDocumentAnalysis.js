@@ -43,7 +43,7 @@ export function mergeSectionAnalyses(sections = []) {
   const seen = Object.fromEntries(SECTION_LISTS.map(key => [key, new Set()]));
   const overviews = [];
   const summaries = [];
-  const readable = value => String(value || "").replace(/\\n/g, "\n").replace(/\\r\\n/g, "\n").trim();
+  const readable = value => String(value || "").replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n").trim();
 
   for (const section of usable) {
     const overview = readable(section.documentOverview);
