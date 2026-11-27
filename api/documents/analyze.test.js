@@ -26,6 +26,17 @@ describe("document analysis response validation", () => {
     expect(() => cleanJson("not JSON")).toThrow();
   });
 
+  it("attaches safe machine-readable codes and field paths to validation failures", () => {
+    try { cleanJson("not JSON"); } catch (error) {
+      expect(error).toMatchObject({ name: "AnalysisValidationError", validationCode: "invalid_json" });
+    }
+    const missingArray = emptyAnalysis();
+    delete missingArray.risks;
+    try { cleanJson(JSON.stringify(missingArray)); } catch (error) {
+      expect(error).toMatchObject({ name: "AnalysisValidationError", validationCode: "invalid_array", validationPath: "risks" });
+    }
+  });
+
   it("marks a quote verified only when its normalized wording exists in the cited document page", () => {
     const analysis = emptyAnalysis({
       clauses: [{
