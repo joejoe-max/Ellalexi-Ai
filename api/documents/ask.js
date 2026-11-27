@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import {fileTypeFromBuffer} from "file-type";
 import {streamWithFallback} from "../_lib/reasoning.js";
 import {preparePdfDocument,extractDocxDocument} from "../_lib/documentExtraction.js";
+import {retrieveSourcePassages} from "../_lib/documentRetrieval.js";
 import {retrieveStructuredEvidence,retrieveSourcePassages} from "../_lib/documentRetrieval.js";
 import {startSSE,sendEvent,endSSE,sendSafeError} from "../_lib/sse.js";
 export const config={api:{bodyParser:false}};
@@ -72,6 +73,7 @@ export default async function handler(req,res){
   }
   const context=JSON.stringify(retrieveRelevantEvidence(analysis,question));
   if(sourceDocs.length){const retrievedSources=retrieveSourcePassages(sourceDocs,question,{maxTokens:1800,maxPages:10});if(retrievedSources.passages.length)parts.push({text:"QUESTION-RELEVANT ORIGINAL PASSAGES. Preserve exact document names and page numbers; do not claim unprovided pages were checked:\\n"+JSON.stringify(retrievedSources.passages)});if(retrievedSources.omitted)parts.push({text:"Some original pages were omitted from retrieval due to the evidence budget. State that limitation if relevant."});}
+  if(sourceDocs.length){const retrievedSources=retrieveSourcePassages(sourceDocs,question,{maxTokens:1800,maxPages:10});if(retrievedSources.passages.length)parts.push({text:"QUESTION-RELEVANT ORIGINAL PASSAGES. Preserve exact document names and page numbers; do not claim unprovided pages were checked:\\n"+JSON.stringify(retrievedSources.passages)});if(retrievedSources.omitted)parts.push({text:"Some original pages were omitted from retrieval due to the evidence budget. State that limitation if relevant."});}
   if(context.length>18000)throw Object.assign(new Error("Relevant evidence is too large for follow-up."),{userMessage:"This question matches too much material. Narrow it to a particular clause, party or subject.",kind:"invalid_request"});
   let legalHint="";
   if(isSueQuestion(question)){
@@ -83,7 +85,7 @@ export default async function handler(req,res){
   parts.push({text:"STRUCTURED REVIEW (secondary context):\n"+context+"\n\nUSER QUESTION:\n"+question.trim()+legalHint});
   if(!uploads.length)parts.unshift({text:"No original file was attached to this follow-up. Use only the structured analysis and clearly state when the source wording cannot be checked."});
   sendEvent(res,"status",{message:sourceRequested?"Checking the original wording and preparing your answer…":"Using your completed document review to prepare an answer…"});
-  const {text}=await streamWithFallback({systemInstruction:SYSTEM,parts,generationConfig:{temperature:0.2,maxOutputTokens:2800},timeout:65000,onToken:chunk=>sendEvent(res,"delta",{text:chunk}),onFallback:()=>sendEvent(res,"fallback",{message:"Trying another AI service…"})});
+  const {text}=await streamWithFallback({systemInstruction:SYSTEM,parts,generationConfig:{temperature:0.2,maxOutputTokens:1200},timeout:65000,onToken:chunk=>sendEvent(res,"delta",{text:chunk}),onFallback:()=>sendEvent(res,"fallback",{message:"Trying another AI service…"})});
   const answer=String(text||"").trim();if(!answer)throw Object.assign(new Error(),{userMessage:"The assistant returned an empty answer. Please rephrase your question.",kind:"empty_response"});
   sendEvent(res,"complete",{answer});endSSE(res);
  }catch(error){sendSafeError(res,error);}finally{for(const buffer of buffers)buffer.fill(0);for(const path of paths){try{await fs.unlink(path);}catch{ /* Ignore malformed optional fields; validation below returns a safe error. */ }}}
