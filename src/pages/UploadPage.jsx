@@ -25,7 +25,7 @@ function Evidence({item}){
   const verified=status==="verified";
   return <div className="analysis-evidence">
     {item.quote&&<blockquote>“{item.quote}”</blockquote>}
-    <small>{item.documentName}{item.page&&item.page!=="not available"?` · Page ${item.page}`:""}</small>
+    <small>{item.documentLabel||item.documentName}{item.page&&item.page!=="not available"?` · Page ${item.page}`:""}</small>
     {verified
       ? <p className="evidence-ok" role="status">Matched against the identified document and page.</p>
       : <p className="evidence-warning" role="note">{messages[status]||"This finding has not been verified against a unique source passage."}</p>}
@@ -168,7 +168,7 @@ export default function UploadPage(){
         <div className="eyebrow">IN SIMPLE TERMS</div>
         <h3 style={{whiteSpace:"pre-line"}}>{analysis.documentOverview}</h3>
         <p style={{whiteSpace:"pre-line"}}>{analysis.executiveSummary}</p>
-        {result.documents?.length>0&&<div className="workspace-documents"><b>Documents included</b>{result.documents.map((doc,i)=><div className="workspace-document" key={`${doc.name}-${i}`}><FileText size={15}/><span>{doc.name}<small>{doc.type} · {doc.pageCount?`${doc.pageCount} pages`:"Page count unavailable"} · {readingSummary(doc)}</small></span></div>)}</div>}
+        {result.documents?.length>0&&<div className="workspace-documents"><b>Documents included</b>{result.documents.map((doc,i)=><div className="workspace-document" key={`${doc.name}-${i}`}><FileText size={15}/><span>{doc.label||doc.name}<small>{doc.type} · {doc.pageCount?`${doc.pageCount} pages`:"Page count unavailable"} · {readingSummary(doc)}{doc.duplicateCount?` · ${doc.duplicateCount} identical duplicate upload${doc.duplicateCount===1?"":"s"} ignored`:""}</small></span></div>)}</div>}
       </section>
 
       <ListSection id="people" title="People and organisations" items={analysis.parties} render={x=><><b>{x.name}</b><p>{x.role}</p><small>{x.source}</small></>}/>
