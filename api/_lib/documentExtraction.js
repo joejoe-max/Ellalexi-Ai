@@ -42,7 +42,7 @@ export function getUnreadablePageNumbers(pages = []) {
   return pages.filter((page) => !isMeaningfulPageText(page.text)).map((page) => page.page);
 }
 
-export async function extractPdfPages(buffer) {
+export async function extractPdfPages(buffer, { deadlineAt } = {}) {
   // Copy the upload into an owned Uint8Array: PDF.js may transfer its backing
   // ArrayBuffer while setting up the parser.
   const data = Uint8Array.from(buffer);
@@ -62,6 +62,7 @@ export async function extractPdfPages(buffer) {
     // serial page-by-page latency without creating 150 simultaneous PDF.js tasks.
     const concurrency = 4;
     for (let start = 1; start <= pdf.numPages; start += concurrency) {
+      if (Number.isFinite(deadlineAt) && deadlineAt - Date.now() < 2500) throw Object.assign(new Error("PDF extraction reached the request deadline."), { kind: "processing_deadline", httpStatus: 503 });
       const batch = Array.from(
         { length: Math.min(concurrency, pdf.numPages - start + 1) },
         (_, offset) => start + offset
@@ -195,7 +196,7 @@ function mergeOcrText(pages, ocrResults) {
 export async function preparePdfDocument(buffer, { onStatus, deadlineAt } = {}) {
   let pages;
   try {
-    pages = await extractPdfPages(buffer);
+    pages = await extractPdfPages(buffer, { deadlineAt });
   } catch (error) {
     if (error.status) throw error;
     // Preserve the original PDF.js exception for server-side diagnostics. The
