@@ -132,7 +132,8 @@ export async function generateWithFallback({
   let lastError;
   let fallbackTriggered = false;
   const outputTokens = Math.max(256, Number(generationConfig.maxOutputTokens || DEFAULT_OUTPUT_TOKENS));
-  for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {\n    const candidate = candidates[candidateIndex];
+  for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {
+    const candidate = candidates[candidateIndex];
     if (Number.isFinite(deadlineAt) && deadlineAt - Date.now() <= 0) {
       throw Object.assign(new Error("The shared processing deadline has expired."), { kind: "processing_deadline", httpStatus: 503 });
     }
