@@ -7,7 +7,12 @@ describe("cross-document evidence preparation",()=>{
     expect(result.evidence.clauses[0]).toMatchObject({documentName:"A.pdf",page:"4",quote:"Exact wording"});
     expect(result.documentNames).toEqual(["A.pdf"]);
   });
-  it("excludes quotes that were not verified against their uploaded source",()=>{\n    const result=buildCrossDocumentEvidence({clauses:[{documentName:"A.pdf",page:"4",quote:"Unverified source wording"}]});\n    expect(result.documentNames).toEqual([]);\n    expect(result.omitted).toBe(1);\n  });\n  it("bounds comparison evidence and records omitted items",()=>{
+  it("excludes quotes that were not verified against their uploaded source",()=>{
+    const result=buildCrossDocumentEvidence({clauses:[{documentName:"A.pdf",page:"4",quote:"Unverified source wording"}]});
+    expect(result.documentNames).toEqual([]);
+    expect(result.omitted).toBe(1);
+  });
+  it("bounds comparison evidence and records omitted items",()=>{
     const result=buildCrossDocumentEvidence({clauses:Array.from({length:100},(_,i)=>({documentName:"A.pdf",page:String(i),quote:"Some contractual wording ".repeat(10),evidenceStatus:"verified"}))},{maxTokens:500});
     expect(result.estimatedTokens).toBeLessThanOrEqual(500);
     expect(result.omitted).toBeGreaterThan(0);
