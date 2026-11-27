@@ -12,7 +12,7 @@ export function enforceLegalCurrentness(result) {
     if (independentlyVerified) return finding;
     downgraded++;
     const historicalOnly = citations.length > 0 && citations.every(citation =>
-      /historical|not independently established|currentness.*not established/i.test(String(citation.sourceStatus || ""))
+      /historical repository|historical material|historical copy/i.test(String(citation.sourceStatus || ""))
     );
     return {
       ...finding,
