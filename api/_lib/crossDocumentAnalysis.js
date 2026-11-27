@@ -35,33 +35,12 @@ export function buildCrossDocumentEvidence(analysis, options = {}) {
 
 const SECTION_LISTS = ["parties","clauses","rightsAndObligations","risks","moneyMatters","missingProtections","questions","limitations"];
 
-/**
- * Soft signature for near-duplicate detection: page + normalised quote head + heading/title.
- * Prefer keeping the item with a longer quote or verified evidence status.
- */
-function softSignature(item, group) {
-  const page = normalise(item?.page || "");
-  const quote = normalise(item?.quote || "").split(" ").slice(0, 4).join(" ");
-  const label = normalise(item?.heading || item?.title || item?.question || item?.name || item?.item || item?.protection || "");
-  const doc = normalise(item?.documentName || "");
-  return [group, doc, page, label, quote].join("|");
-}
-
-function qualityScore(item) {
-  let score = 0;
-  if (item?.evidenceStatus === "verified") score += 10;
-  if (item?.quote) score += Math.min(5, Math.floor(String(item.quote).length / 40));
-  if (item?.page && item.page !== "not available") score += 2;
-  return score;
-}
-
 export function mergeSectionAnalyses(sections = []) {
   const usable = sections.filter(section => section && typeof section === "object" && !Array.isArray(section));
   if (!usable.length) return null;
   const merged = { ...usable[0], crossDocumentFindings: [] };
   for (const key of SECTION_LISTS) merged[key] = [];
   const seenExact = Object.fromEntries(SECTION_LISTS.map(key => [key, new Set()]));
-  const seenSoft = Object.fromEntries(SECTION_LISTS.map(key => [key, new Map()]));
   const overviews = [];
   const summaries = [];
   const readable = value => String(value || "").replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n").trim();
@@ -76,18 +55,7 @@ export function mergeSectionAnalyses(sections = []) {
       for (const item of section[key]) {
         const exact = JSON.stringify(item);
         if (seenExact[key].has(exact)) continue;
-        const soft = softSignature(item, key);
-        const prior = seenSoft[key].get(soft);
-        if (prior !== undefined) {
-          if (qualityScore(item) <= qualityScore(prior)) continue;
-          const idx = merged[key].indexOf(prior);
-          if (idx >= 0) merged[key][idx] = item;
-          seenSoft[key].set(soft, item);
-          seenExact[key].add(exact);
-          continue;
-        }
         seenExact[key].add(exact);
-        seenSoft[key].set(soft, item);
         merged[key].push(item);
       }
     }
