@@ -28,16 +28,15 @@ describe("cross-document evidence preparation",()=>{
     expect(merged.risks).toHaveLength(1);
     expect(merged.crossDocumentFindings).toEqual([]);
   });
-  it("keeps the higher-quality near-duplicate finding during soft dedup",()=>{
+  it("does not collapse distinct clauses that share only their opening words",()=>{
     const weaker={heading:"Termination",documentName:"A.pdf",page:"3",quote:"Either party may terminate",evidenceStatus:"not_located"};
     const stronger={heading:"Termination",documentName:"A.pdf",page:"3",quote:"Either party may terminate on thirty days written notice",evidenceStatus:"verified"};
     const merged=mergeSectionAnalyses([
       {documentOverview:"Overview A",executiveSummary:"Summary A",clauses:[weaker]},
       {documentOverview:"Overview B",executiveSummary:"Summary B",clauses:[stronger]}
     ]);
-    expect(merged.clauses).toHaveLength(1);
-    expect(merged.clauses[0].evidenceStatus).toBe("verified");
-    expect(merged.clauses[0].quote).toContain("thirty days");
+    expect(merged.clauses).toHaveLength(2);
+    expect(merged.clauses.map(item=>item.quote)).toEqual([weaker.quote,stronger.quote]);
   });
   it("deduplicates identical findings independent of document ordering",()=>{
     expect(mergeCrossDocumentFindings(
