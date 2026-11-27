@@ -60,22 +60,31 @@ function parse(req) {
 }
 export function cleanJson(raw, expectedDocument) {
   const value = String(raw || "").trim().replace(/^\x60\x60\x60(?:json)?\s*/i, "").replace(/\s*\x60\x60\x60$/, "");
-  const parsed = JSON.parse(value);
+  const fail = (message, code, path = null) => {
+    const error = new Error(message);
+    error.name = "AnalysisValidationError";
+    error.validationCode = code;
+    error.validationPath = path;
+    throw error;
+  };
+  let parsed;
+  try { parsed = JSON.parse(value); }
+  catch { fail("Analysis response is not valid JSON.", "invalid_json"); }
   const result = parsed?.analysis && typeof parsed.analysis === "object" ? parsed.analysis : parsed?.result && typeof parsed.result === "object" ? parsed.result : parsed;
-  if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error("Analysis response is not an object.");
+  if (!result || typeof result !== "object" || Array.isArray(result)) fail("Analysis response is not an object.", "invalid_root");
 
   const arrays = ["parties","clauses","rightsAndObligations","risks","moneyMatters","missingProtections","questions","crossDocumentFindings","limitations"];
-  for (const field of arrays) if (!Array.isArray(result[field])) throw new Error("Analysis field is missing or malformed: " + field);
-  if (typeof result.documentOverview !== "string" || !result.documentOverview.trim()) throw new Error("Analysis overview is missing.");
-  if (typeof result.executiveSummary !== "string" || !result.executiveSummary.trim()) throw new Error("Analysis summary is missing.");
+  for (const field of arrays) if (!Array.isArray(result[field])) fail("Analysis field is missing or malformed: " + field, "invalid_array", field);
+  if (typeof result.documentOverview !== "string" || !result.documentOverview.trim()) fail("Analysis overview is missing.", "missing_text", "documentOverview");
+  if (typeof result.executiveSummary !== "string" || !result.executiveSummary.trim()) fail("Analysis summary is missing.", "missing_text", "executiveSummary");
 
   const requireObjectFields = (group, fields) => {
     for (const [index, item] of result[group].entries()) {
-      if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(group + "[" + index + "] is not an object.");
-      for (const field of fields) if (typeof item[field] !== "string" || !item[field].trim()) throw new Error(group + "[" + index + "] is missing " + field + ".");
+      if (!item || typeof item !== "object" || Array.isArray(item)) fail(group + "[" + index + "] is not an object.", "invalid_item", group + "[" + index + "]");
+      for (const field of fields) if (typeof item[field] !== "string" || !item[field].trim()) fail(group + "[" + index + "] is missing " + field + ".", "missing_field", group + "[" + index + "]." + field);
       if (expectedDocument && ["clauses","rightsAndObligations","risks","moneyMatters"].includes(group)) {
-        if (item.documentId !== expectedDocument.documentId) throw new Error(group + "[" + index + "] has an incorrect source document ID.");
-        if (item.documentName !== expectedDocument.documentName) throw new Error(group + "[" + index + "] has an incorrect source document name.");
+        if (item.documentId !== expectedDocument.documentId) fail(group + "[" + index + "] has an incorrect source document ID.", "source_identity_mismatch", group + "[" + index + "].documentId");
+        if (item.documentName !== expectedDocument.documentName) fail(group + "[" + index + "] has an incorrect source document name.", "source_identity_mismatch", group + "[" + index + "].documentName");
       }
     }
   };
@@ -88,12 +97,12 @@ export function cleanJson(raw, expectedDocument) {
   requireObjectFields("questions",["question","reason","documentName","page"]);
 
   for (const [index, item] of result.clauses.entries()) {
-    if (!Array.isArray(item.benefits) || !Array.isArray(item.burdens) || !Array.isArray(item.terminology)) throw new Error("clauses[" + index + "] has malformed detail arrays.");
-    if (!["high","medium","low","unclear"].includes(item.riskLevel)) throw new Error("clauses[" + index + "] has an invalid risk level.");
-    for (const term of item.terminology) if (!term || ["term","meaning","effectInThisClause"].some(key => typeof term[key] !== "string" || !term[key].trim())) throw new Error("clauses[" + index + "] has malformed terminology.");
+    if (!Array.isArray(item.benefits) || !Array.isArray(item.burdens) || !Array.isArray(item.terminology)) fail("clauses[" + index + "] has malformed detail arrays.", "invalid_detail_arrays", "clauses[" + index + "]");
+    if (!["high","medium","low","unclear"].includes(item.riskLevel)) fail("clauses[" + index + "] has an invalid risk level.", "invalid_enum", "clauses[" + index + "].riskLevel");
+    for (const [termIndex, term] of item.terminology.entries()) if (!term || ["term","meaning","effectInThisClause"].some(key => typeof term[key] !== "string" || !term[key].trim())) fail("clauses[" + index + "] has malformed terminology.", "invalid_nested_item", "clauses[" + index + "].terminology[" + termIndex + "]");
   }
-  for (const [index, item] of result.risks.entries()) if (!["high","medium","low","unclear"].includes(item.severity)) throw new Error("risks[" + index + "] has an invalid severity.");
-  for (const [index, item] of result.rightsAndObligations.entries()) if (!["right","obligation","condition","restriction","unclear"].includes(item.kind)) throw new Error("rightsAndObligations[" + index + "] has an invalid kind.");
+  for (const [index, item] of result.risks.entries()) if (!["high","medium","low","unclear"].includes(item.severity)) fail("risks[" + index + "] has an invalid severity.", "invalid_enum", "risks[" + index + "].severity");
+  for (const [index, item] of result.rightsAndObligations.entries()) if (!["right","obligation","condition","restriction","unclear"].includes(item.kind)) fail("rightsAndObligations[" + index + "] has an invalid kind.", "invalid_enum", "rightsAndObligations[" + index + "].kind");
 
   // Section-level passes may not claim cross-document comparisons.
   result.crossDocumentFindings = [];
