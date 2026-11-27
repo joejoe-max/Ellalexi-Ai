@@ -38,9 +38,9 @@ export function classifyReasoningError(status, payload = {}, cause) {
 
 export function classifyProviderPayload(payload) {
   const choice = payload?.choices?.[0];
+  if (choice?.finish_reason === "length") return { kind: "truncated_response", detail: "finish_reason_length" };
   const text = choice?.message?.content;
   if (typeof text !== "string" || !text.trim()) return { kind: "empty_response", detail: "missing_content" };
-  if (choice.finish_reason === "length") return { kind: "truncated_response", detail: "finish_reason_length" };
   return { kind: "ok" };
 }
 
