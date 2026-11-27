@@ -3,9 +3,10 @@ import fs from "node:fs/promises";
 import {fileTypeFromBuffer} from "file-type";
 import {streamWithFallback} from "../_lib/reasoning.js";
 import {preparePdfDocument,extractDocxDocument} from "../_lib/documentExtraction.js";
+import {retrieveStructuredEvidence,retrieveSourcePassages} from "../_lib/documentRetrieval.js";
 import {startSSE,sendEvent,endSSE,sendSafeError} from "../_lib/sse.js";
 export const config={api:{bodyParser:false}};
-const MAX_FILES=5,MAX_FILE=10*1024*1024,MAX_TOTAL=25*1024*1024,MAX_TEXT=180000;
+const MAX_FILES=5,MAX_FILE=10*1024*1024,MAX_TOTAL=25*1024*1024;
 
 const SYSTEM = `You are EllaBrief, a Nigerian legal-document explanation assistant. Help ordinary people understand what they are being asked to sign — what the document says and how that sits against ordinary Nigerian legal principles.
 
@@ -37,13 +38,9 @@ function field(fields,key){const value=one(fields[key]);if(typeof value!=="strin
 /* eslint-disable no-control-regex */
 function clean(value){return String(value||"").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,"");}
 
-function questionTerms(question){return [...new Set(String(question||"").toLowerCase().match(/[a-z0-9]{3,}/g)||[])].filter(term=>!["the","and","for","that","this","with","from","what","which","does","about","into","are","you","can","will","have","has","its"].includes(term));}
-function retrieveRelevantEvidence(analysis,question,{maxItems=16,maxChars=14000}={}){
- const terms=questionTerms(question);const groups=["crossDocumentFindings","clauses","rightsAndObligations","risks","moneyMatters","parties","missingProtections","questions"];const ranked=[];
- for(const group of groups){for(const item of Array.isArray(analysis?.[group])?analysis[group]:[]){const text=JSON.stringify(item);const lower=text.toLowerCase();const score=terms.reduce((sum,term)=>sum+(lower.includes(term)?1:0),0)+(group==="crossDocumentFindings"?1:0);if(score>0)ranked.push({group,item,score});}}
- ranked.sort((a,b)=>b.score-a.score);let used=0;const selected={};
- for(const row of ranked){if(Object.values(selected).flat().length>=maxItems)break;const text=JSON.stringify(row.item);if(used+text.length>maxChars)continue;(selected[row.group] ||= []).push(row.item);used+=text.length;}
- return {documentOverview:String(analysis.documentOverview||"").slice(0,1800),executiveSummary:String(analysis.executiveSummary||"").slice(0,1800),evidence:selected,limitations:(analysis.limitations||[]).slice(0,6),evidenceItems:Object.values(selected).reduce((n,a)=>n+a.length,0)};
+function retrieveRelevantEvidence(analysis,question){
+ const result=retrieveStructuredEvidence(analysis,question,{maxTokens:2600,maxItems:36});
+ return {documentOverview:String(analysis.documentOverview||"").slice(0,900),executiveSummary:String(analysis.executiveSummary||"").slice(0,900),evidence:result.evidence,limitations:(analysis.limitations||[]).slice(0,5),omittedFindings:result.omitted};
 }
 function isLegalQuestion(question){
   return /\b(law|legal|sue|suing|sued|court|rights?|remed(y|ies)|enforce|breach|liable|liability|statute|act\b|cama|constitution|illegal|unlawful|red ?flag|protect(ion|ed)?|damages|injunction|arbitration|dispute)\b/i.test(question);
@@ -63,7 +60,7 @@ export default async function handler(req,res){
   if(!question.trim()||question.length>1200)throw Object.assign(new Error(),{userMessage:"Enter a question of up to 1,200 characters.",kind:"invalid_request"});
   if(!analysis||typeof analysis!=="object"||Array.isArray(analysis))throw Object.assign(new Error(),{userMessage:"The active document analysis is required.",kind:"invalid_request"});
   const sourceRequested=needsOriginalSource(question);
-  const raw=sourceRequested?files.documents:null;const uploads=Array.isArray(raw)?raw:raw?[raw]:[];const parts=[];let total=0,textChars=0;
+  const raw=sourceRequested?files.documents:null;const uploads=Array.isArray(raw)?raw:raw?[raw]:[];const parts=[];const sourceDocs=[];let total=0;
   for(const file of uploads){
    paths.push(file.filepath);const buffer=await fs.readFile(file.filepath);buffers.push(buffer);total+=buffer.length;
    if(total>MAX_TOTAL)throw Object.assign(new Error("The source files exceed the supported combined size."),{status:413});
@@ -71,10 +68,10 @@ export default async function handler(req,res){
    if(!pdf&&!docx)throw Object.assign(new Error("A source file is not a valid PDF or DOCX."),{status:400});
    const name=clean(file.originalFilename||"Uploaded document").slice(0,180);
    const extracted=pdf?await preparePdfDocument(buffer):await extractDocxDocument(buffer);
-   const text=String(extracted.text||"").slice(0,Math.max(0,MAX_TEXT-textChars));textChars+=text.length;
-   if(text)parts.push({text:"ORIGINAL DOCUMENT: "+name+" ("+(pdf?"PDF":"DOCX")+")\n"+text});
+   sourceDocs.push({name,pages:extracted.pages||[{page:"not available",text:extracted.text||""}]});
   }
   const context=JSON.stringify(retrieveRelevantEvidence(analysis,question));
+  if(sourceDocs.length){const retrievedSources=retrieveSourcePassages(sourceDocs,question,{maxTokens:1800,maxPages:10});if(retrievedSources.passages.length)parts.push({text:"QUESTION-RELEVANT ORIGINAL PASSAGES. Preserve exact document names and page numbers; do not claim unprovided pages were checked:\\n"+JSON.stringify(retrievedSources.passages)});if(retrievedSources.omitted)parts.push({text:"Some original pages were omitted from retrieval due to the evidence budget. State that limitation if relevant."});}
   if(context.length>18000)throw Object.assign(new Error("Relevant evidence is too large for follow-up."),{userMessage:"This question matches too much material. Narrow it to a particular clause, party or subject.",kind:"invalid_request"});
   let legalHint="";
   if(isSueQuestion(question)){
