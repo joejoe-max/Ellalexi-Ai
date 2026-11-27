@@ -12,13 +12,13 @@ describe("cross-document evidence preparation",()=>{
     expect(result.estimatedTokens).toBeLessThanOrEqual(500);
     expect(result.omitted).toBeGreaterThan(0);
   });
-  it("joins summaries using real paragraph breaks and converts escaped newline text",()=>{
+  it("joins summaries with actual line breaks and converts escaped newline text",()=>{
     const merged=mergeSectionAnalyses([
       {documentOverview:"First section.\\n\\nSecond paragraph.",executiveSummary:"Summary one.",clauses:[{heading:"A"}],crossDocumentFindings:[{finding:"Invented"}]},
       {documentOverview:"Second section.",executiveSummary:"Summary two.",clauses:[{heading:"B"}],risks:[{title:"Risk"}],crossDocumentFindings:[{finding:"Also invented"}]}
     ]);
-    expect(merged.documentOverview).toBe("First section.\\n\\nSecond paragraph.\\n\\nSecond section.");
-    expect(merged.executiveSummary).toBe("Summary one.\\n\\nSummary two.");
+    expect(merged.documentOverview).toBe("First section.\n\nSecond paragraph.\n\nSecond section.");
+    expect(merged.executiveSummary).toBe("Summary one.\n\nSummary two.");
     expect(merged.clauses.map(item=>item.heading)).toEqual(["A","B"]);
     expect(merged.risks).toHaveLength(1);
     expect(merged.crossDocumentFindings).toEqual([]);
