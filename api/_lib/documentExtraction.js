@@ -42,6 +42,40 @@ export function getUnreadablePageNumbers(pages = []) {
   return pages.filter((page) => !isMeaningfulPageText(page.text)).map((page) => page.page);
 }
 
+/**
+ * Rebuild reading text from PDF.js runs using their geometry. PDF.js may split
+ * one word into several adjacent text items; blindly joining every item with
+ * a space corrupts quotations and search text.
+ */
+export function buildPdfPageText(items = []) {
+  let output = "";
+  let previous = null;
+  for (const item of items) {
+    if (typeof item?.str !== "string" || !item.str) continue;
+    const current = item.str;
+    if (!previous) { output = current; previous = item; continue; }
+    const previousTransform = previous.transform;
+    const currentTransform = item.transform;
+    const previousY = Number(previousTransform?.[5]);
+    const currentY = Number(currentTransform?.[5]);
+    const fontSize = Math.max(1, Math.abs(Number(previousTransform?.[3]) || 0), Math.abs(Number(currentTransform?.[3]) || 0));
+    const newLine = Boolean(previous.hasEOL) ||
+      (Number.isFinite(previousY) && Number.isFinite(currentY) && Math.abs(previousY-currentY) > fontSize*0.35);
+    if (newLine) output += "\n";
+    else if (!/\s$/.test(output) && !/^\s/.test(current)) {
+      const x = Number(previousTransform?.[4]);
+      const width = Number(previous.width);
+      const nextX = Number(currentTransform?.[4]);
+      const hasGeometry = Number.isFinite(x) && Number.isFinite(width) && Number.isFinite(nextX);
+      const gap = hasGeometry ? nextX-(x+width) : Infinity;
+      if (!hasGeometry || gap > Math.max(1.5,fontSize*0.12)) output += " ";
+    }
+    output += current;
+    previous = item;
+  }
+  return output.replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
+}
+
 export async function extractPdfPages(buffer, { deadlineAt } = {}) {
   // Copy the upload into an owned Uint8Array: PDF.js may transfer its backing
   // ArrayBuffer while setting up the parser.
@@ -70,11 +104,7 @@ export async function extractPdfPages(buffer, { deadlineAt } = {}) {
       const extracted = await Promise.all(batch.map(async number => {
         const page = await pdf.getPage(number);
         const content = await page.getTextContent();
-        const text = content.items
-          .map((item) => typeof item.str === "string" ? item.str : "")
-          .join(" ")
-          .replace(/\s+/g, " ")
-          .trim();
+        const text = buildPdfPageText(content.items);
         return { page: number, text };
       }));
       for (const item of extracted) pages[item.page - 1] = item;
