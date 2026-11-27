@@ -303,7 +303,24 @@ async function runWithFallback(options, invoke) {
         const started = Date.now();
         const fallbackTriggered = Boolean(viaFallback || i > 0 || m > 0);
         try {
-          const result = await invoke(options, provider, model, formatMode);
+          const remaining = Number.isFinite(options.deadlineAt) ? options.deadlineAt - Date.now() : Infinity;
+          if (remaining <= 0) {
+            throw Object.assign(new Error("The analysis request reached its processing deadline."), {
+              kind: "processing_deadline",
+              retry: false,
+              provider,
+              model,
+              httpStatus: 503,
+              userMessage: "This document set needs more processing time than one request can safely provide. Split it into smaller groups and try again."
+            });
+          }
+          const attemptOptions = {
+            ...options,
+            timeout: Number.isFinite(remaining)
+              ? Math.max(1, Math.min(Number(options.timeout) || 90000, remaining))
+              : options.timeout
+          };
+          const result = await invoke(attemptOptions, provider, model, formatMode);
           logAttempt({
             provider, model, stage, attempt, formatMode, outcome: "success",
             promptTokenEstimate: result.promptTokenEstimate, completionTokenCap: result.completionTokenCap,
