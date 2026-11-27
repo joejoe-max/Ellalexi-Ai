@@ -183,7 +183,7 @@ export async function generateWithFallback({
         if (validateResponse) {
           try {
             validated = await validateResponse({ provider: candidate.provider, model: candidate.model, text, payload, finishReason: payload.choices?.[0]?.finish_reason || "stop" });
-          } catch (cause) {
+          } catch {
             lastError = Object.assign(new Error("The provider response failed application validation."), {
               kind: "invalid_response", retry: true, provider: candidate.provider,
               model: candidate.model, httpStatus: 502
