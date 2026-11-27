@@ -1,7 +1,7 @@
 import {estimateTokens} from "./documentChunker.js";
 
 const GROUPS = ["parties","clauses","rightsAndObligations","risks","moneyMatters","missingProtections","questions"];
-const FIELDS = ["name","role","source","heading","documentName","page","quote","plainMeaning","practicalEffect","party","kind","description","title","severity","whoAffected","whyItMatters","item","amount","frequency","notes","protection","scope","question","reason"];
+const FIELDS = ["name","role","source","heading","documentId","documentLabel","documentName","page","quote","plainMeaning","practicalEffect","party","kind","description","title","severity","whoAffected","whyItMatters","item","amount","frequency","notes","protection","scope","question","reason"];
 const compact = item => {
   const value = {};
   for (const key of FIELDS) {
@@ -16,21 +16,38 @@ export function buildCrossDocumentEvidence(analysis, options = {}) {
   const maxTokens = Math.max(500, Number.isFinite(requested) && requested > 0 ? requested : 2400);
   const evidence = {};
   const evidenceByDocument = {};
+  const namesById = new Map();
   let used = 0;
   let omitted = 0;
+
   for (const group of GROUPS) {
     for (const raw of Array.isArray(analysis?.[group]) ? analysis[group] : []) {
       const item = compact(raw);
-      const documentName = item.documentName;
-      if (!documentName || raw?.evidenceStatus !== "verified" || !item.quote) { omitted++; continue; }
+      const documentId = item.documentId;
+      if (!documentId || !item.documentName || raw?.evidenceStatus !== "verified" || !item.quote) {
+        omitted++;
+        continue;
+      }
       const tokens = estimateTokens(JSON.stringify(item));
-      if (used + tokens > maxTokens) { omitted++; continue; }
+      if (used + tokens > maxTokens) {
+        omitted++;
+        continue;
+      }
       (evidence[group] ||= []).push(item);
-      (evidenceByDocument[documentName] ||= []).push({ group, ...item });
+      (evidenceByDocument[documentId] ||= []).push({ group, ...item });
+      namesById.set(documentId, item.documentLabel || item.documentName);
       used += tokens;
     }
   }
-  return { evidence, evidenceByDocument, documentNames: Object.keys(evidenceByDocument), estimatedTokens: used, omitted };
+
+  return {
+    evidence,
+    evidenceByDocument,
+    documentIds: Object.keys(evidenceByDocument),
+    documentNames: [...namesById.values()],
+    estimatedTokens: used,
+    omitted
+  };
 }
 
 const SECTION_LISTS = ["parties","clauses","rightsAndObligations","risks","moneyMatters","missingProtections","questions","limitations"];
@@ -106,35 +123,47 @@ export function consolidateDocumentNarratives(analysis, { documentNames = [] } =
 export function validateCrossDocumentFindings(findings = [], comparison = {}) {
   if (!Array.isArray(findings)) return [];
   const byDocument = comparison.evidenceByDocument || {};
-  const allowed = new Set(comparison.documentNames || Object.keys(byDocument));
+  const allowedIds = new Set(comparison.documentIds || Object.keys(byDocument));
   const accepted = [];
+
   for (const item of findings) {
     if (!item || typeof item.finding !== "string" || item.finding.trim().length < 20) continue;
-    const documents = Array.isArray(item.documents) ? [...new Set(item.documents.filter(name => typeof name === "string" && allowed.has(name)))] : [];
-    if (documents.length < 2) continue;
+    const documentIds = Array.isArray(item.documentIds)
+      ? [...new Set(item.documentIds.filter(id => typeof id === "string" && allowedIds.has(id)))]
+      : [];
+    if (documentIds.length < 2) continue;
+
     const citations = Array.isArray(item.evidence) ? item.evidence : [];
     const verified = [];
     let valid = true;
-    for (const documentName of documents) {
-      const citation = citations.find(entry => entry?.documentName === documentName);
+
+    for (const documentId of documentIds) {
+      const citation = citations.find(entry => entry?.documentId === documentId);
       const quote = normalise(citation?.quote);
-      const sourceEntries = byDocument[documentName] || [];
       const page = String(citation?.page || "not available");
-      const matchedSource = sourceEntries.find(source => {
-        const sourceQuote = normalise(source.quote);
-        const pageMatches = String(source.page || "not available") === page;
-        return pageMatches && quote.length >= 12 && (sourceQuote.includes(quote) || (quote.includes(sourceQuote) && sourceQuote.length >= 12));
-      });
+      const sourceEntries = byDocument[documentId] || [];
+      const matchedSource = sourceEntries.find(source =>
+        String(source.page || "not available") === page &&
+        quote.length >= 12 &&
+        normalise(source.quote) === quote
+      );
       if (!matchedSource) {
         valid = false;
         break;
       }
-      verified.push({ documentName, page, quote: String(citation.quote).slice(0, 420) });
+      verified.push({
+        documentId,
+        documentName: matchedSource.documentLabel || matchedSource.documentName,
+        page,
+        quote: String(matchedSource.quote).slice(0, 420)
+      });
     }
-    if (!valid || verified.length !== documents.length) continue;
+
+    if (!valid || verified.length !== documentIds.length) continue;
     accepted.push({
       finding: item.finding.trim().slice(0, 1800),
-      documents,
+      documentIds,
+      documents: verified.map(entry => entry.documentName),
       significance: String(item.significance || "Requires review").slice(0, 500),
       evidence: verified
     });
