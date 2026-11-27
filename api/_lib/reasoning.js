@@ -3,7 +3,6 @@ import { estimateRequestTokens } from "./tokenBudget.js";
 const DEFAULT_GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
 const OPENROUTER_MODEL = "openai/gpt-oss-120b:free";
 const DEFAULT_OUTPUT_TOKENS = 1000;
-const unique = values => [...new Set(values.filter(Boolean))];
 
 export function getGroqReasoningModels() {
   return [...DEFAULT_GROQ_MODELS];
