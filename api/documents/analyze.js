@@ -47,7 +47,7 @@ function parse(req) {
   const form = formidable({ multiples: true, maxFiles: MAX_FILES, maxFileSize: MAX_FILE, maxTotalFileSize: MAX_TOTAL, allowEmptyFiles: false, minFileSize: 1, keepExtensions: true });
   return new Promise((resolve, reject) => form.parse(req, (error, fields, files) => error ? reject(error) : resolve(files)));
 }
-function cleanJson(raw) {
+export function cleanJson(raw) {
   const value = String(raw || "").trim().replace(/^\x60\x60\x60(?:json)?\s*/i, "").replace(/\s*\x60\x60\x60$/, "");
   const parsed = JSON.parse(value);
   const result = parsed?.analysis && typeof parsed.analysis === "object" ? parsed.analysis : parsed?.result && typeof parsed.result === "object" ? parsed.result : parsed;
@@ -68,7 +68,7 @@ function findSourceDocument(documents, name) {
   const matches = documents.filter(document => normaliseDocumentName(document.name) === target);
   return matches.length === 1 ? matches[0] : null;
 }
-function verifyEvidence(analysis, documents) {
+export function verifyEvidence(analysis, documents) {
   const groups = ["clauses", "rightsAndObligations", "risks", "moneyMatters"];
   for (const group of groups) {
     analysis[group] = analysis[group].filter(item => item && typeof item === "object" && typeof item.quote === "string" && item.quote.trim() && typeof item.documentName === "string");
