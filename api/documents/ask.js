@@ -3,7 +3,6 @@ import fs from "node:fs/promises";
 import {fileTypeFromBuffer} from "file-type";
 import {streamWithFallback} from "../_lib/reasoning.js";
 import {preparePdfDocument,extractDocxDocument} from "../_lib/documentExtraction.js";
-import {retrieveSourcePassages} from "../_lib/documentRetrieval.js";
 import {retrieveStructuredEvidence,retrieveSourcePassages} from "../_lib/documentRetrieval.js";
 import {startSSE,sendEvent,endSSE,sendSafeError} from "../_lib/sse.js";
 export const config={api:{bodyParser:false}};
@@ -71,8 +70,7 @@ export default async function handler(req,res){
    const extracted=pdf?await preparePdfDocument(buffer):await extractDocxDocument(buffer);
    sourceDocs.push({name,pages:extracted.pages||[{page:"not available",text:extracted.text||""}]});
   }
-  const context=JSON.stringify(retrieveRelevantEvidence(analysis,question));
-  if(sourceDocs.length){const retrievedSources=retrieveSourcePassages(sourceDocs,question,{maxTokens:1800,maxPages:10});if(retrievedSources.passages.length)parts.push({text:"QUESTION-RELEVANT ORIGINAL PASSAGES. Preserve exact document names and page numbers; do not claim unprovided pages were checked:\\n"+JSON.stringify(retrievedSources.passages)});if(retrievedSources.omitted)parts.push({text:"Some original pages were omitted from retrieval due to the evidence budget. State that limitation if relevant."});}
+  const context=JSON.stringify({...retrieveRelevantEvidence(analysis,question),legalReview});
   if(sourceDocs.length){const retrievedSources=retrieveSourcePassages(sourceDocs,question,{maxTokens:1800,maxPages:10});if(retrievedSources.passages.length)parts.push({text:"QUESTION-RELEVANT ORIGINAL PASSAGES. Preserve exact document names and page numbers; do not claim unprovided pages were checked:\\n"+JSON.stringify(retrievedSources.passages)});if(retrievedSources.omitted)parts.push({text:"Some original pages were omitted from retrieval due to the evidence budget. State that limitation if relevant."});}
   if(context.length>18000)throw Object.assign(new Error("Relevant evidence is too large for follow-up."),{userMessage:"This question matches too much material. Narrow it to a particular clause, party or subject.",kind:"invalid_request"});
   let legalHint="";
