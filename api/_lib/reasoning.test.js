@@ -1,6 +1,7 @@
 import{describe,it,expect,vi,afterEach}from"vitest";
 import{generateWithFallback,streamWithFallback,getGroqReasoningModels,classifyReasoningError}from"./reasoning.js";
-describe("Groq-first reasoning failover",()=>{afterEach(()=>vi.unstubAllEnvs());
+import{resetTokenBudgets}from"./tokenBudget.js";
+describe("Groq-first reasoning failover",()=>{afterEach(()=>{vi.unstubAllEnvs();resetTokenBudgets();});
 it("uses configured Groq model order",()=>{vi.stubEnv("GROQ_REASONING_MODELS","model-a,model-b,model-a");expect(getGroqReasoningModels()).toEqual(["model-a","model-b"])});
 it("classifies provider rate limits and model errors",()=>{expect(classifyReasoningError(429).retry).toBe(true);expect(classifyReasoningError(404).kind).toBe("model_unavailable");expect(classifyReasoningError(400).retry).toBe(false)});
 it("fails over to the next Groq model after a quota response",async()=>{vi.stubEnv("GROQ_API_KEY","g");vi.stubEnv("GROQ_REASONING_MODELS","first,second");const fetchImpl=vi.fn().mockResolvedValueOnce({ok:false,status:429,json:async()=>({error:{code:"rate_limit"}})}).mockResolvedValueOnce({ok:true,json:async()=>({choices:[{message:{content:"answer"},finish_reason:"stop"}]})});const result=await generateWithFallback({parts:[{text:"hello"}],fetchImpl});expect(result).toMatchObject({provider:"groq",model:"second",text:"answer"});expect(fetchImpl).toHaveBeenCalledTimes(2)});
