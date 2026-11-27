@@ -35,12 +35,33 @@ export function buildCrossDocumentEvidence(analysis, options = {}) {
 
 const SECTION_LISTS = ["parties","clauses","rightsAndObligations","risks","moneyMatters","missingProtections","questions","limitations"];
 
+/**
+ * Soft signature for near-duplicate detection: page + normalised quote head + heading/title.
+ * Prefer keeping the item with a longer quote or verified evidence status.
+ */
+function softSignature(item, group) {
+  const page = normalise(item?.page || "");
+  const quote = normalise(item?.quote || "").slice(0, 80);
+  const label = normalise(item?.heading || item?.title || item?.question || item?.name || item?.item || item?.protection || "");
+  const doc = normalise(item?.documentName || "");
+  return [group, doc, page, label, quote].join("|");
+}
+
+function qualityScore(item) {
+  let score = 0;
+  if (item?.evidenceStatus === "verified") score += 10;
+  if (item?.quote) score += Math.min(5, Math.floor(String(item.quote).length / 40));
+  if (item?.page && item.page !== "not available") score += 2;
+  return score;
+}
+
 export function mergeSectionAnalyses(sections = []) {
   const usable = sections.filter(section => section && typeof section === "object" && !Array.isArray(section));
   if (!usable.length) return null;
   const merged = { ...usable[0], crossDocumentFindings: [] };
   for (const key of SECTION_LISTS) merged[key] = [];
-  const seen = Object.fromEntries(SECTION_LISTS.map(key => [key, new Set()]));
+  const seenExact = Object.fromEntries(SECTION_LISTS.map(key => [key, new Set()]));
+  const seenSoft = Object.fromEntries(SECTION_LISTS.map(key => [key, new Map()]));
   const overviews = [];
   const summaries = [];
   const readable = value => String(value || "").replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n").trim();
@@ -53,9 +74,20 @@ export function mergeSectionAnalyses(sections = []) {
     for (const key of SECTION_LISTS) {
       if (!Array.isArray(section[key])) continue;
       for (const item of section[key]) {
-        const signature = JSON.stringify(item);
-        if (seen[key].has(signature)) continue;
-        seen[key].add(signature);
+        const exact = JSON.stringify(item);
+        if (seenExact[key].has(exact)) continue;
+        const soft = softSignature(item, key);
+        const prior = seenSoft[key].get(soft);
+        if (prior !== undefined) {
+          if (qualityScore(item) <= qualityScore(prior)) continue;
+          const idx = merged[key].indexOf(prior);
+          if (idx >= 0) merged[key][idx] = item;
+          seenSoft[key].set(soft, item);
+          seenExact[key].add(exact);
+          continue;
+        }
+        seenExact[key].add(exact);
+        seenSoft[key].set(soft, item);
         merged[key].push(item);
       }
     }
@@ -63,6 +95,44 @@ export function mergeSectionAnalyses(sections = []) {
   merged.documentOverview = overviews.join("\n\n");
   merged.executiveSummary = summaries.join("\n\n");
   return merged;
+}
+
+/**
+ * After section merge, optionally run a lightweight deterministic cleanup
+ * that collapses near-identical overviews when they clearly describe the same document.
+ */
+export function consolidateDocumentNarratives(analysis, { documentNames = [] } = {}) {
+  if (!analysis || typeof analysis !== "object") return analysis;
+  const names = documentNames.length ? documentNames : [...new Set((analysis.clauses || []).map(c => c.documentName).filter(Boolean))];
+  if (names.length === 1) {
+    const overview = String(analysis.documentOverview || "");
+    const parts = overview.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      const unique = [];
+      const seen = new Set();
+      for (const part of parts) {
+        const key = normalise(part).slice(0, 120);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(part);
+      }
+      analysis.documentOverview = unique.join("\n\n");
+    }
+    const summary = String(analysis.executiveSummary || "");
+    const sParts = summary.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+    if (sParts.length > 1) {
+      const unique = [];
+      const seen = new Set();
+      for (const part of sParts) {
+        const key = normalise(part).slice(0, 120);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(part);
+      }
+      analysis.executiveSummary = unique.join("\n\n");
+    }
+  }
+  return analysis;
 }
 
 export function validateCrossDocumentFindings(findings = [], comparison = {}) {
