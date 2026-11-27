@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {buildCrossDocumentEvidence,mergeCrossDocumentFindings,mergeSectionAnalyses,validateCrossDocumentFindings} from "./crossDocumentAnalysis.js";
+import {buildCrossDocumentEvidence,mergeCrossDocumentFindings,mergeSectionAnalyses,validateCrossDocumentFindings,consolidateDocumentNarratives} from "./crossDocumentAnalysis.js";
 
 describe("cross-document evidence preparation",()=>{
   it("preserves exact source document names, pages and quotes",()=>{
@@ -28,11 +28,48 @@ describe("cross-document evidence preparation",()=>{
     expect(merged.risks).toHaveLength(1);
     expect(merged.crossDocumentFindings).toEqual([]);
   });
+  it("keeps the higher-quality near-duplicate finding during soft dedup",()=>{
+    const weaker={heading:"Termination",documentName:"A.pdf",page:"3",quote:"Either party may terminate",evidenceStatus:"not_located"};
+    const stronger={heading:"Termination",documentName:"A.pdf",page:"3",quote:"Either party may terminate on thirty days written notice",evidenceStatus:"verified"};
+    const merged=mergeSectionAnalyses([
+      {documentOverview:"Overview A",executiveSummary:"Summary A",clauses:[weaker]},
+      {documentOverview:"Overview B",executiveSummary:"Summary B",clauses:[stronger]}
+    ]);
+    expect(merged.clauses).toHaveLength(1);
+    expect(merged.clauses[0].evidenceStatus).toBe("verified");
+    expect(merged.clauses[0].quote).toContain("thirty days");
+  });
   it("deduplicates identical findings independent of document ordering",()=>{
     expect(mergeCrossDocumentFindings(
       [{finding:"Conflict",documents:["A","B"],significance:"High"}],
       [{finding:"Conflict",documents:["B","A"],significance:"High"}]
     )).toHaveLength(1);
+  });
+});
+
+describe("document narrative consolidation",()=>{
+  it("collapses repeated overview paragraphs for a single uploaded document",()=>{
+    const analysis={
+      documentOverview:"This is the employment agreement.\n\nThis is the employment agreement.\n\nIt covers salary and notice.",
+      executiveSummary:"Summary one.\n\nSummary one.\n\nExtra detail.",
+      clauses:[{documentName:"Offer.pdf",heading:"Salary"}]
+    };
+    consolidateDocumentNarratives(analysis,{documentNames:["Offer.pdf"]});
+    expect(analysis.documentOverview).toBe("This is the employment agreement.\n\nIt covers salary and notice.");
+    expect(analysis.executiveSummary).toBe("Summary one.\n\nExtra detail.");
+  });
+  it("does not collapse overviews when multiple original documents are present",()=>{
+    const analysis={
+      documentOverview:"Doc A overview.\n\nDoc B overview.",
+      executiveSummary:"A.\n\nB.",
+      clauses:[
+        {documentName:"A.pdf",heading:"One"},
+        {documentName:"B.pdf",heading:"Two"}
+      ]
+    };
+    const before=analysis.documentOverview;
+    consolidateDocumentNarratives(analysis,{documentNames:["A.pdf","B.pdf"]});
+    expect(analysis.documentOverview).toBe(before);
   });
 });
 
