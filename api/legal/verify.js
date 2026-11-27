@@ -1,6 +1,7 @@
 import { searchLiveLegalSources } from "../../src/lib/liveLegalSearch.js";
 import {generateWithFallback} from "../_lib/reasoning.js";
 import {retrieveLegalSources} from "../../src/lib/legalSourceRetrieval.js";
+import {buildLegalReviewContext} from "../_lib/legalReviewContext.js";
 import {startSSE,sendEvent,endSSE,sendSafeError} from "../_lib/sse.js";
 
 const SCHEMA = { type:"OBJECT", properties:{
@@ -135,19 +136,7 @@ export default async function handler(req, res) {
     return send(res, 400, { error: "A document analysis object is required." });
   }
 
-  const compact = {
-    documentOverview: String(analysis.documentOverview || "").slice(0, 3000),
-    executiveSummary: String(analysis.executiveSummary || "").slice(0, 3000),
-    clauses: Array.isArray(analysis.clauses)
-      ? analysis.clauses.filter(item => item?.evidenceStatus === "verified").slice(0, 15).map(({ heading, plainMeaning, quote, documentName, documentLabel, page, benefits, burdens: _burdens, terminology }) =>
-        ({ heading, plainMeaning, quote, documentName: documentLabel || documentName, page }))
-      : [],
-    risks: Array.isArray(analysis.risks)
-      ? analysis.risks.filter(item => item?.evidenceStatus === "verified").slice(0, 12).map(({ title, whyItMatters, quote, documentName, documentLabel, page }) =>
-        ({ title, whyItMatters, quote, documentName: documentLabel || documentName, page }))
-      : [],
-    questions: Array.isArray(analysis.questions) ? analysis.questions.slice(0, 8) : []
-  };
+  const compact = buildLegalReviewContext(analysis);
 
   try {
     const docType = inferDocumentType(compact);
