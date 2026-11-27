@@ -67,6 +67,16 @@ describe("cross-document claim validation",()=>{
     ],comparison);
     expect(findings).toEqual([]);
   });
+  it("rejects source quotes assigned to the wrong page",()=>{
+    expect(validateCrossDocumentFindings([{
+      finding:"The delivery deadlines differ between the two agreements.",
+      documents:["A.pdf","B.pdf"],
+      evidence:[
+        {documentName:"A.pdf",page:"99",quote:"The supplier shall deliver all goods by 1 June."},
+        {documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June."}
+      ]
+    }],comparison)).toEqual([]);
+  });
   it("rejects unsupported or incomplete citations",()=>{
     expect(validateCrossDocumentFindings([{
       finding:"A comparison without citations for both sides.",
