@@ -11,7 +11,7 @@ describe("document chunking",()=>{
     expect(chunks[0].text).toContain("[Page 3]");
   });
   it("splits long documents into bounded chunks",()=>{
-    const chunks=chunkDocument({name:"Long.docx",text:Array.from({length:900},(_,i)=>`Paragraph ${i} contains contractual wording and obligations.`).join("\\n\\n")},{targetTokens:600,overlapTokens:40});
+    const chunks=chunkDocument({name:"Long.docx",text:Array.from({length:900},(_,i)=>"Paragraph "+i+" contains contractual wording and obligations.").join("\n\n")},{targetTokens:600,overlapTokens:40});
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.every(chunk=>chunk.estimatedTokens>0)).toBe(true);
   });
@@ -24,13 +24,12 @@ describe("document chunking",()=>{
     const first="FIRST-CLAUSE ".repeat(105);
     const second="SECOND-CLAUSE ".repeat(150);
     const third="THIRD-CLAUSE ".repeat(150);
-    const chunks=chunkDocument({name:"Long.pdf",pages:[{page:4,text:[first,second,third].join("\\n")}]},{targetTokens,overlapTokens});
+    const chunks=chunkDocument({name:"Long.pdf",pages:[{page:4,text:[first,second,third].join("\n")}]},{targetTokens,overlapTokens});
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks[0].text).toContain("FIRST-CLAUSE");
     expect(chunks[0].text).not.toContain("THIRD-CLAUSE");
     expect(chunks[1].overlapFromPrevious).toBe(true);
-    const secondChunkBody=chunks[1].text.split("[Page 4]\\n").slice(1).join("[Page 4]\\n");
-    expect(secondChunkBody).toContain("FIRST-CLAUSE");
+    expect(chunks[1].text.startsWith("[Page 4]\n"+first.slice(-overlapTokens*3.2).trim())).toBe(true);
     expect(chunks[1].text).toContain("SECOND-CLAUSE");
     expect(chunks.every(chunk=>chunk.text.length<=maxChars+64)).toBe(true);
   });
