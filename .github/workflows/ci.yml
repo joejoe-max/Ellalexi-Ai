@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, feat/ai-provider-failover-ocr-search]
+    branches: [main, feat/ai-provider-failover-ocr-search, fix/pr9-analysis-integrity]
   pull_request:
     branches: [main]
 
