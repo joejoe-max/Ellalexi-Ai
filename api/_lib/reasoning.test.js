@@ -2,7 +2,7 @@ import{describe,it,expect,vi,afterEach}from"vitest";
 import{generateWithFallback,streamWithFallback,getGroqReasoningModels,getOpenRouterModels,classifyReasoningError}from"./reasoning.js";
 import{resetTokenBudgets}from"./tokenBudget.js";
 describe("Groq-first reasoning failover",()=>{afterEach(()=>{vi.unstubAllEnvs();resetTokenBudgets();});
-it("uses configured Groq model order",()=>{vi.stubEnv("GROQ_REASONING_MODELS","model-a,model-b,model-a");expect(getGroqReasoningModels()).toEqual(["model-a","model-b"])});
+it("uses a fixed Groq primary and fallback model order",()=>{vi.stubEnv("GROQ_REASONING_MODELS","untrusted/override");expect(getGroqReasoningModels()).toEqual(["openai/gpt-oss-120b","openai/gpt-oss-20b"])});
 it("converts Gemini-style schema types to OpenAI JSON Schema types",async()=>{
   vi.stubEnv("GROQ_API_KEY","g");
   vi.stubEnv("GROQ_REASONING_MODELS","schema-model");
