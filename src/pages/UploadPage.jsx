@@ -14,14 +14,21 @@ function readingSummary(doc){
 const size=n=>n<1048576?`${Math.max(1,Math.round(n/1024))} KB`:`${(n/1048576).toFixed(1)} MB`;
 
 function Evidence({item}){
-  const verified=item.evidenceStatus==="verified";
-  const showQuote=Boolean(item.quote);
+  const status=item.evidenceStatus||"missing_evidence";
+  const messages={
+    unverified:"This quotation could not be matched to the extracted source text. Check the original document.",
+    missing_evidence:"No usable source quotation was supplied. This finding is not evidence-verified.",
+    ambiguous_source:"The source reference does not uniquely identify one uploaded document.",
+    ambiguous_page:"The quotation appears on multiple pages and its cited page is ambiguous.",
+    page_mismatch:`The quotation was found on page ${item.matchedPage}, not the cited page ${item.page}. It is not marked verified.`
+  };
+  const verified=status==="verified";
   return <div className="analysis-evidence">
-    {showQuote&&<blockquote>“{item.quote}”</blockquote>}
+    {item.quote&&<blockquote>“{item.quote}”</blockquote>}
     <small>{item.documentName}{item.page&&item.page!=="not available"?` · Page ${item.page}`:""}</small>
-    {verified&&<p className="evidence-ok">Matched against the document text.</p>}
-
-    {!verified&&item.evidenceStatus==="not_located"&&<p>Could not automatically re-find this passage in the extracted text. Compare with the original document.</p>}
+    {verified
+      ? <p className="evidence-ok" role="status">Matched against the identified document and page.</p>
+      : <p className="evidence-warning" role="note">{messages[status]||"This finding has not been verified against a unique source passage."}</p>}
   </div>;
 }
 
