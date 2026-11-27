@@ -3,6 +3,15 @@ import{generateWithFallback,streamWithFallback,getGroqReasoningModels,getOpenRou
 import{resetTokenBudgets}from"./tokenBudget.js";
 describe("Groq-first reasoning failover",()=>{afterEach(()=>{vi.unstubAllEnvs();resetTokenBudgets();});
 it("uses configured Groq model order",()=>{vi.stubEnv("GROQ_REASONING_MODELS","model-a,model-b,model-a");expect(getGroqReasoningModels()).toEqual(["model-a","model-b"])});
+it("converts Gemini-style schema types to OpenAI JSON Schema types",async()=>{
+  vi.stubEnv("GROQ_API_KEY","g");
+  vi.stubEnv("GROQ_REASONING_MODELS","schema-model");
+  const fetchImpl=vi.fn().mockResolvedValue({ok:true,json:async()=>({choices:[{message:{content:"{\"ok\":true}"},finish_reason:"stop"}]})});
+  await generateWithFallback({parts:[{text:"hello"}],generationConfig:{responseMimeType:"application/json",responseSchema:{type:"OBJECT",properties:{ok:{type:"BOOLEAN"}},required:["ok"]}},fetchImpl});
+  const body=JSON.parse(fetchImpl.mock.calls[0][1].body);
+  expect(body.response_format.json_schema.schema.type).toBe("object");
+  expect(body.response_format.json_schema.schema.properties.ok.type).toBe("boolean");
+});
 it("uses a valid OpenRouter fallback model when no model is configured",()=>{vi.stubEnv("OPENROUTER_MODELS","");vi.stubEnv("OPENROUTER_MODEL","");expect(getOpenRouterModels()).toEqual(["openrouter/free"])});
 it("keeps the OpenRouter fallback model hardcoded and ignores model-name environment variables",()=>{vi.stubEnv("OPENROUTER_MODELS","custom/model");vi.stubEnv("OPENROUTER_MODEL","another/model");expect(getOpenRouterModels()).toEqual(["openrouter/free"])});
 it("classifies provider rate limits and model errors",()=>{expect(classifyReasoningError(429).retry).toBe(true);expect(classifyReasoningError(404).kind).toBe("model_unavailable");expect(classifyReasoningError(400).retry).toBe(false)});
