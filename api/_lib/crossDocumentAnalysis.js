@@ -41,7 +41,7 @@ const SECTION_LISTS = ["parties","clauses","rightsAndObligations","risks","money
  */
 function softSignature(item, group) {
   const page = normalise(item?.page || "");
-  const quote = normalise(item?.quote || "").slice(0, 80);
+  const quote = normalise(item?.quote || "").split(" ").slice(0, 4).join(" ");
   const label = normalise(item?.heading || item?.title || item?.question || item?.name || item?.item || item?.protection || "");
   const doc = normalise(item?.documentName || "");
   return [group, doc, page, label, quote].join("|");
