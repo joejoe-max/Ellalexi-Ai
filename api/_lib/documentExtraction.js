@@ -160,7 +160,7 @@ async function ocrPdfWithTesseract(buffer, pageNumbers, { deadlineAt } = {}) {
   try {
     const results = [];
     for (const number of pageNumbers) {
-      if (Number.isFinite(deadlineAt) && deadlineAt - Date.now() < 5000) throw Object.assign(new Error("Not enough request time remains for local OCR."), { kind: "processing_deadline" });
+      if (Number.isFinite(deadlineAt) && deadlineAt - Date.now() < 5000) throw Object.assign(new Error("Not enough request time remains for local OCR."), { kind: "processing_deadline", httpStatus: 503, userMessage: "This scanned document needs more processing time than one request can safely provide. Try fewer scanned pages or a text-based copy." });
       const page = await pdf.getPage(number);
       let scale = 1.45;
       let viewport = page.getViewport({ scale });
