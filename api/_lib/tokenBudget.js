@@ -35,9 +35,21 @@ export function reserveTokenBudget({ key = "groq", tokens, limit = DEFAULT_BUDGE
     const oldest = active[0];
     return { allowed: false, reason: "window_budget_exhausted", used, remaining: Math.max(0, limit - used), retryAfterMs: oldest ? Math.max(1, WINDOW_MS - (now - oldest.at)) : WINDOW_MS };
   }
-  active.push({ at: now, tokens: amount });
+  const reservation = { at: now, tokens: amount };
+  active.push(reservation);
   buckets.set(key, active);
-  return { allowed: true, used: used + amount, remaining: Math.max(0, limit - used - amount), retryAfterMs: 0 };
+  return { allowed: true, used: used + amount, remaining: Math.max(0, limit - used - amount), retryAfterMs: 0, reservation };
+}
+
+/** Release estimates for failed attempts so retries do not consume the same request budget repeatedly. */
+export function releaseTokenBudget({ key = "groq", reservation } = {}) {
+  if (!reservation) return false;
+  const active = buckets.get(key) || [];
+  const index = active.indexOf(reservation);
+  if (index < 0) return false;
+  active.splice(index, 1);
+  buckets.set(key, active);
+  return true;
 }
 
 export function resetTokenBudgets() { buckets.clear(); }
