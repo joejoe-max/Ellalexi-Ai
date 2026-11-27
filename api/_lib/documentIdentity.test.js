@@ -10,6 +10,14 @@ describe("document identity", () => {
     expect(a).toMatch(/^doc_[a-f0-9]+_Agreement\.pdf$/);
   });
 
+  it("distinguishes files that share the first 64 KB but differ later", () => {
+    const first = Buffer.alloc(70_000, 1);
+    const second = Buffer.from(first);
+    second[69_999] = 2;
+    expect(createDocumentId({ name: "Same.pdf", size: first.length, buffer: first }))
+      .not.toBe(createDocumentId({ name: "Same.pdf", size: second.length, buffer: second }));
+  });
+
   it("creates a uuid-based id when no buffer is available", () => {
     const id = createDocumentId({ name: "note.docx" });
     expect(id).toMatch(/^doc_[a-f0-9]+$/);
