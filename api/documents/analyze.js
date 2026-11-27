@@ -60,7 +60,7 @@ function cleanJson(raw) {
   if (typeof result.executiveSummary !== "string" || !result.executiveSummary.trim()) throw new Error("Analysis summary is missing.");
   return result;
 }
-const normaliseQuote = value => String(value || "").normalize("NFKC").toLowerCase().replace(/[“”‘’]/g, "'").replace(/\s+/g, " ").replace(/[.,;:!?()[\]{}"']/g, "").trim();
+const normaliseQuote = value => String(value || "").normalize("NFKC").toLowerCase().replace(/[“”‘’]/g, "'").replace(/\s+/g, " ").replace(/[.,;:!?(){}"']/g, "").trim();
 function findSourceDocument(documents, name) {
   const exact = documents.find(document => document.name === name);
   if (exact) return exact;
