@@ -111,13 +111,49 @@ export function cleanJson(raw, expectedDocument) {
 
 const normaliseQuote = value => String(value || "")
   .normalize("NFKC")
-  .replace(/\u00ad/g, "")
+  .replace(/[\u00ad\u200b\ufeff]/g, "")
+  .replace(/([\p{L}\p{N}])[-\u2010\u2011\u2012\u2013]\s+(?=[\p{L}\p{N}])/gu, "$1")
   .toLowerCase()
   .replace(/[“”]/g, '"')
   .replace(/[‘’]/g, "'")
+  .replace(/[\u2010-\u2015]/g, " ")
   .replace(/[^\p{L}\p{N}]+/gu, " ")
   .replace(/\s+/g, " ")
   .trim();
+
+const quoteTokens = value => normaliseQuote(value).split(" ").filter(Boolean);
+
+/**
+ * Match exact normalized wording first. The conservative fallback permits a
+ * word to be split across adjacent PDF.js runs, but requires the reconstructed
+ * token sequence to match every quoted word in order.
+ */
+export function matchSourceQuote(sourceText, quotation) {
+  const source = normaliseQuote(sourceText);
+  const quote = normaliseQuote(quotation);
+  if (!quote || quote.length < 12) return { matched: false, method: "none" };
+  if (source.includes(quote)) return { matched: true, method: "exact" };
+
+  const sourceTokens = quoteTokens(source);
+  const wantedTokens = quoteTokens(quote);
+  if (wantedTokens.length < 3 || wantedTokens.length > sourceTokens.length) return { matched: false, method: "none" };
+
+  for (let start = 0; start < sourceTokens.length; start++) {
+    let sourceIndex = start;
+    let matched = true;
+    for (const wanted of wantedTokens) {
+      let reconstructed = "";
+      let consumed = 0;
+      while (sourceIndex < sourceTokens.length && reconstructed.length < wanted.length && consumed < 3) {
+        reconstructed += sourceTokens[sourceIndex++];
+        consumed++;
+      }
+      if (reconstructed !== wanted) { matched = false; break; }
+    }
+    if (matched) return { matched: true, method: "normalized" };
+  }
+  return { matched: false, method: "none" };
+}
 
 function findSourceDocument(documents, item) {
   const id = String(item?.documentId || "").trim();
@@ -159,8 +195,14 @@ export function verifyEvidence(analysis, documents) {
         continue;
       }
       const pages = Array.isArray(doc.pages) ? doc.pages : [];
-      const matches = pages.filter(page => normaliseQuote(page.text).includes(quote));
-      if (!matches.length && !pages.length && normaliseQuote(doc.text).includes(quote)) matches.push({ page: "not available" });
+      const matches = pages
+        .map(page => ({ page, result: matchSourceQuote(page.text, item.quote) }))
+        .filter(match => match.result.matched)
+        .map(match => ({ ...match.page, matchMethod: match.result.method }));
+      if (!matches.length && !pages.length) {
+        const wholeDocumentMatch = matchSourceQuote(doc.text, item.quote);
+        if (wholeDocumentMatch.matched) matches.push({ page: "not available", matchMethod: wholeDocumentMatch.method });
+      }
       item.documentId = doc.documentId;
       item.documentName = doc.name;
       item.documentLabel = doc.documentLabel || doc.name;
@@ -182,8 +224,11 @@ export function verifyEvidence(analysis, documents) {
         item.evidenceNote = "The quotation was found on page " + matchedPages[0] + ", not on the cited page " + claimedPage + ".";
       } else {
         item.page = pageMatch ? claimedPage : matchedPages[0];
-        item.evidenceStatus = "verified";
-        item.evidenceNote = "The quoted wording was matched against the identified uploaded document and page.";
+        const normalizedMatch = matches.some(match => match.matchMethod === "normalized");
+        item.evidenceStatus = normalizedMatch ? "verified_normalized" : "verified";
+        item.evidenceNote = normalizedMatch
+          ? "The quotation matched after conservative normalization of PDF text extraction spacing and typography."
+          : "The quoted wording was matched against the identified uploaded document and page.";
       }
     }
   }
