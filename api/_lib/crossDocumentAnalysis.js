@@ -22,7 +22,7 @@ export function buildCrossDocumentEvidence(analysis, options = {}) {
     for (const raw of Array.isArray(analysis?.[group]) ? analysis[group] : []) {
       const item = compact(raw);
       const documentName = item.documentName;
-      if (!documentName) { omitted++; continue; }
+      if (!documentName || raw?.evidenceStatus !== "verified" || !item.quote) { omitted++; continue; }
       const tokens = estimateTokens(JSON.stringify(item));
       if (used + tokens > maxTokens) { omitted++; continue; }
       (evidence[group] ||= []).push(item);
