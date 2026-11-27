@@ -1,5 +1,5 @@
 import{describe,it,expect,vi,afterEach}from"vitest";
-import{generateWithFallback,streamWithFallback,getGroqReasoningModels,getOpenRouterModels,classifyReasoningError}from"./reasoning.js";
+import{generateWithFallback,streamWithFallback,getGroqReasoningModels,getOpenRouterModels,classifyReasoningError,classifyProviderPayload}from"./reasoning.js";
 import{resetTokenBudgets}from"./tokenBudget.js";
 describe("Groq-first reasoning failover",()=>{afterEach(()=>{vi.unstubAllEnvs();resetTokenBudgets();});
 it("uses a fixed Groq primary and fallback model order",()=>{vi.stubEnv("GROQ_REASONING_MODELS","untrusted/override");expect(getGroqReasoningModels()).toEqual(["openai/gpt-oss-120b","openai/gpt-oss-20b"])});
@@ -12,8 +12,8 @@ it("converts Gemini-style schema types to OpenAI JSON Schema types",async()=>{
   expect(body.response_format.json_schema.schema.type).toBe("object");
   expect(body.response_format.json_schema.schema.properties.ok.type).toBe("boolean");
 });
-it("uses a pinned free OpenRouter fallback model",()=>{vi.stubEnv("OPENROUTER_MODELS","");vi.stubEnv("OPENROUTER_MODEL","");expect(getOpenRouterModels()).toEqual(["openai/gpt-oss-120b:free"])});
-it("keeps the OpenRouter fallback model pinned and ignores model-name environment variables",()=>{vi.stubEnv("OPENROUTER_MODELS","custom/model");vi.stubEnv("OPENROUTER_MODEL","another/model");expect(getOpenRouterModels()).toEqual(["openai/gpt-oss-120b:free"])});
+it("uses a pinned free OpenRouter fallback model",()=>{vi.stubEnv("OPENROUTER_MODELS","");vi.stubEnv("OPENROUTER_MODEL","");expect(getOpenRouterModels()).toEqual(["openrouter/free"])});
+it("keeps the OpenRouter fallback model pinned and ignores model-name environment variables",()=>{vi.stubEnv("OPENROUTER_MODELS","custom/model");vi.stubEnv("OPENROUTER_MODEL","another/model");expect(getOpenRouterModels()).toEqual(["openrouter/free"])});
 it("classifies provider rate limits and model errors",()=>{expect(classifyReasoningError(429).retry).toBe(true);expect(classifyReasoningError(404).kind).toBe("model_unavailable");expect(classifyReasoningError(400).retry).toBe(false)});
 it("fails over to the next Groq model after a quota response",async()=>{vi.stubEnv("GROQ_API_KEY","g");vi.stubEnv("GROQ_REASONING_MODELS","first,second");const fetchImpl=vi.fn().mockResolvedValueOnce({ok:false,status:429,json:async()=>({error:{code:"rate_limit"}})}).mockResolvedValueOnce({ok:true,json:async()=>({choices:[{message:{content:"answer"},finish_reason:"stop"}]})});const result=await generateWithFallback({parts:[{text:"hello"}],fetchImpl});expect(result).toMatchObject({provider:"groq",model:"openai/gpt-oss-20b",text:"answer"});expect(fetchImpl).toHaveBeenCalledTimes(2)});
 it("uses OpenRouter after both pinned Groq models are unavailable",async()=>{vi.stubEnv("GROQ_API_KEY","g");vi.stubEnv("OPENROUTER_API_KEY","o");const unavailable=()=>({ok:false,status:503,json:async()=>({})});const fetchImpl=vi.fn().mockResolvedValueOnce(unavailable()).mockResolvedValueOnce(unavailable()).mockResolvedValueOnce({ok:true,json:async()=>({choices:[{message:{content:"fallback answer"}}]})});const result=await generateWithFallback({parts:[{text:"hello"}],fetchImpl});expect(result).toMatchObject({provider:"openrouter",text:"fallback answer"});expect(fetchImpl).toHaveBeenCalledTimes(3);expect(fetchImpl.mock.calls[2][0]).toContain("openrouter.ai")});
