@@ -75,7 +75,8 @@ export function chunkDocument(doc, options = {}) {
   };
 
   for (const page of pages) {
-    const pieces = splitLongText(page.text, maxChars);
+    const pieceLimit = Math.max(1, maxChars - overlapChars - 24);
+    const pieces = splitLongText(page.text, overlapChars > 0 ? pieceLimit : maxChars);
     for (let index = 0; index < pieces.length; index++) {
       const piece = pieces[index];
       let overlap = "";
@@ -95,7 +96,6 @@ export function chunkDocument(doc, options = {}) {
         overlap = previousPiece.slice(-Math.min(overlapChars, Math.max(0, maxChars - piece.length - 24))).trim();
       }
 
-      if (piece.length + overlap.length + 16 > maxChars) overlap = "";
       current.push({ page: page.page, text: piece, overlap });
       currentChars += piece.length + overlap.length + 16;
       if (currentChars >= maxChars * 0.9 && index < pieces.length - 1) flush();
