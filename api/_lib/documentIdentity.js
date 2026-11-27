@@ -10,9 +10,9 @@ import { createHash, randomUUID } from "node:crypto";
  * Prefer a content-aware hash when a buffer is available so the same file
  * uploaded again in the same session keeps a recognisable identity.
  */
-export function createDocumentId({ name, _size, buffer } = {}) {
+export function createDocumentId({ name, size, buffer } = {}) {
   if (buffer && buffer.length) {
-    const digest = createHash("sha256").update(buffer.subarray(0, Math.min(buffer.length, 64 * 1024))).digest("hex").slice(0, 16);
+    const digest = createHash("sha256").update(buffer).update(String(size ?? buffer.length)).digest("hex").slice(0, 16);
     const safeName = String(name || "document").replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 48);
     return `doc_${digest}_${safeName}`;
   }
