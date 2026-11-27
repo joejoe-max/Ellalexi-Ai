@@ -3,12 +3,12 @@ import {buildCrossDocumentEvidence,mergeCrossDocumentFindings,mergeSectionAnalys
 
 describe("cross-document evidence preparation",()=>{
   it("preserves exact source document names, pages and quotes",()=>{
-    const result=buildCrossDocumentEvidence({clauses:[{documentName:"A.pdf",page:"4",quote:"Exact wording",heading:"IP ownership"}]});
+    const result=buildCrossDocumentEvidence({clauses:[{documentName:"A.pdf",page:"4",quote:"Exact wording",heading:"IP ownership",evidenceStatus:"verified"}]});
     expect(result.evidence.clauses[0]).toMatchObject({documentName:"A.pdf",page:"4",quote:"Exact wording"});
     expect(result.documentNames).toEqual(["A.pdf"]);
   });
-  it("bounds comparison evidence and records omitted items",()=>{
-    const result=buildCrossDocumentEvidence({clauses:Array.from({length:100},(_,i)=>({documentName:"A.pdf",page:String(i),quote:"Some contractual wording ".repeat(10)}))},{maxTokens:500});
+  it("excludes quotes that were not verified against their uploaded source",()=>{\n    const result=buildCrossDocumentEvidence({clauses:[{documentName:"A.pdf",page:"4",quote:"Unverified source wording"}]});\n    expect(result.documentNames).toEqual([]);\n    expect(result.omitted).toBe(1);\n  });\n  it("bounds comparison evidence and records omitted items",()=>{
+    const result=buildCrossDocumentEvidence({clauses:Array.from({length:100},(_,i)=>({documentName:"A.pdf",page:String(i),quote:"Some contractual wording ".repeat(10),evidenceStatus:"verified"}))},{maxTokens:500});
     expect(result.estimatedTokens).toBeLessThanOrEqual(500);
     expect(result.omitted).toBeGreaterThan(0);
   });
@@ -34,8 +34,8 @@ describe("cross-document evidence preparation",()=>{
 describe("cross-document claim validation",()=>{
   const comparison=buildCrossDocumentEvidence({
     clauses:[
-      {documentName:"A.pdf",page:"2",quote:"The supplier shall deliver all goods by 1 June."},
-      {documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June."}
+      {documentName:"A.pdf",page:"2",quote:"The supplier shall deliver all goods by 1 June.",evidenceStatus:"verified"},
+      {documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June.",evidenceStatus:"verified"}
     ]
   });
   it("accepts a finding only with two known documents and matching quotes from both",()=>{
