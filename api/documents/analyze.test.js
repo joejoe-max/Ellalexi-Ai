@@ -118,7 +118,7 @@ describe("document analysis response validation", () => {
 
 
   it("normalizes PDF line-wrap hyphenation and Unicode typography", () => {
-    expect(matchSourceQuote("The contribu-\\ntor shall receive a monthly stipend of N50,000.", "The contributor shall receive a monthly stipend of N50,000.").matched).toBe(true);
+    expect(matchSourceQuote("The contribu-\ntor shall receive a monthly stipend of N50,000.", "The contributor shall receive a monthly stipend of N50,000.").matched).toBe(true);
     expect(matchSourceQuote("The Company shall pay the contributor’s fee — monthly.", "The Company shall pay the contributor's fee monthly.").matched).toBe(true);
   });
 
