@@ -174,8 +174,9 @@ export function validateCrossDocumentFindings(findings = [], comparison = {}) {
 export function mergeCrossDocumentFindings(existing = [], additions = []) {
   const seen = new Set();
   return [...existing, ...additions].filter(item => {
+    const ids = Array.isArray(item?.documentIds) ? item.documentIds.slice().sort().join("|") : "";
     const docs = Array.isArray(item?.documents) ? item.documents.slice().sort().join("|") : "";
-    const key = [normalise(item?.finding), docs, normalise(item?.significance)].join("::");
+    const key = [normalise(item?.finding), ids || docs, normalise(item?.significance)].join("::");
     if (!item?.finding || seen.has(key)) return false;
     seen.add(key);
     return true;
