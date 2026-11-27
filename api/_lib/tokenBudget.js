@@ -1,5 +1,8 @@
 const WINDOW_MS = 60_000;
-const DEFAULT_BUDGET = 5_500;
+/** Local per-instance TPM guard. 5500 was too low for structured document analysis
+ *  (system + schema + section + ~2k completion), so sequential sections hit
+ *  local_token_budget even on small PDFs. Provider rate limits remain authoritative. */
+const DEFAULT_BUDGET = 14_000;
 const DEFAULT_OUTPUT_RESERVE = 1_200;
 const buckets = new Map();
 
@@ -48,6 +51,22 @@ export function releaseTokenBudget({ key = "groq", reservation } = {}) {
   const index = active.indexOf(reservation);
   if (index < 0) return false;
   active.splice(index, 1);
+  buckets.set(key, active);
+  return true;
+}
+
+/**
+ * After a successful provider response, shrink the reservation to actual usage
+ * so later sections in the same request are not blocked by over-reservation.
+ */
+export function settleTokenBudget({ key = "groq", reservation, actualTokens } = {}) {
+  if (!reservation) return false;
+  const amount = Math.max(0, Math.ceil(Number(actualTokens) || 0));
+  if (!amount) return releaseTokenBudget({ key, reservation });
+  const active = buckets.get(key) || [];
+  const index = active.indexOf(reservation);
+  if (index < 0) return false;
+  reservation.tokens = Math.min(reservation.tokens, amount);
   buckets.set(key, active);
   return true;
 }
