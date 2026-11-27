@@ -55,6 +55,18 @@ function toMessages(parts = [], systemInstruction) {
     { role: "user", content }
   ];
 }
+function normalizeJsonSchema(schema) {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
+  const result = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === "type" && typeof value === "string") result[key] = value.toLowerCase();
+    else if (key === "properties" && value && typeof value === "object") {
+      result[key] = Object.fromEntries(Object.entries(value).map(([name, child]) => [name, normalizeJsonSchema(child)]));
+    } else if (key === "items") result[key] = normalizeJsonSchema(value);
+    else result[key] = value;
+  }
+  return result;
+}
 function responseFormat(config = {}, mode = "schema") {
   if (config.responseMimeType !== "application/json") return undefined;
   if (mode === "object" || !config.responseSchema) return { type: "json_object" };
@@ -63,7 +75,7 @@ function responseFormat(config = {}, mode = "schema") {
     json_schema: {
       name: "ellabrief_response",
       strict: false,
-      schema: config.responseSchema
+      schema: normalizeJsonSchema(config.responseSchema)
     }
   };
 }
@@ -148,7 +160,7 @@ export async function generateWithFallback({
       continue;
     }
     let jsonMode = "schema";
-    for (let attempt = 0; attempt < (candidate.provider === "groq" && responseFormat(generationConfig) ? 2 : 1); attempt++) {
+    for (let attempt = 0; attempt < (generationConfig.responseMimeType === "application/json" ? 2 : 1); attempt++) {
       const remaining = Number.isFinite(deadlineAt) ? deadlineAt - Date.now() : timeout;
       if (remaining <= 0) {
         if (budget.reservation) releaseTokenBudget({ key: "groq", reservation: budget.reservation });
@@ -178,7 +190,7 @@ export async function generateWithFallback({
           }
           lastError = makeError(classified, candidate.provider, candidate.model, response.status, payload);
           safeLog(stage, candidate.provider, candidate.model, classified.kind);
-          if (classified.kind === "json_validation" && candidate.provider === "groq" && attempt === 0) {
+          if (["json_validation", "unsupported_format"].includes(classified.kind) && attempt === 0) {
             jsonMode = "object";
             continue;
           }
@@ -197,6 +209,10 @@ export async function generateWithFallback({
               model: candidate.model, httpStatus: 502
             });
             safeLog(stage, candidate.provider, candidate.model, "invalid_response");
+            if (attempt === 0 && jsonMode === "schema") {
+              jsonMode = "object";
+              continue;
+            }
             if (budget.reservation) releaseTokenBudget({ key: "groq", reservation: budget.reservation });
             break;
           }
