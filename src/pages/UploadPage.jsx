@@ -159,8 +159,8 @@ export default function UploadPage(){
 
       <section className="analysis-summary" id="analysis-overview">
         <div className="eyebrow">IN SIMPLE TERMS</div>
-        <h3>{analysis.documentOverview}</h3>
-        <p>{analysis.executiveSummary}</p>
+        <h3 style={{whiteSpace:"pre-line"}}>{analysis.documentOverview}</h3>
+        <p style={{whiteSpace:"pre-line"}}>{analysis.executiveSummary}</p>
         {result.documents?.length>0&&<div className="workspace-documents"><b>Documents included</b>{result.documents.map((doc,i)=><div className="workspace-document" key={`${doc.name}-${i}`}><FileText size={15}/><span>{doc.name}<small>{doc.type} · {doc.pageCount?`${doc.pageCount} pages`:"Page count unavailable"} · {readingSummary(doc)}</small></span></div>)}</div>}
       </section>
 
@@ -171,7 +171,7 @@ export default function UploadPage(){
       <ListSection id="money" title="Money and financial terms" items={analysis.moneyMatters} render={x=><><b>{x.item}</b><p>{x.amount} · {x.frequency}</p><p>{x.notes}</p><Evidence item={x}/></>}/>
       <ListSection id="protections" title="Protections to consider" items={analysis.missingProtections} render={x=><><b>{x.protection}</b><p>{x.whyItMatters}</p><small>{x.scope}</small></>}/>
       <ListSection id="questions" title="Questions worth asking" items={analysis.questions} render={x=><><b>{x.question}</b><p>{x.reason}</p><small>{x.documentName}{x.page&&x.page!=="not available"?` · Page ${x.page}`:""}</small></>}/>
-      <ListSection id="cross-documents" title="Across your documents" items={analysis.crossDocumentFindings} render={x=><><b>{x.finding}</b><p>{x.significance}</p><small>{x.documents.join(" · ")}</small></>}/>
+      <ListSection id="cross-documents" title="Across your documents" items={analysis.crossDocumentFindings} render={x=><><b>{x.finding}</b><p>{x.significance}</p><small>{x.documents.join(" · ")}</small>{x.evidence?.length>0&&<details className="cross-document-evidence"><summary>View source passages</summary>{x.evidence.map((e,i)=><blockquote key={e.documentName+i}>“{e.quote}”<small>{e.documentName}{e.page&&e.page!=="not available"?` · Page ${e.page}`:""}</small></blockquote>)}</details>}</>}/>
       <ListSection id="limitations" title="Limitations" items={analysis.limitations} render={x=><p>{x}</p>}/>
 
       <AnalysisTools analysis={analysis} documents={result.documents||[]} legalReview={legalReview?.data?.result||null} files={files}/>
