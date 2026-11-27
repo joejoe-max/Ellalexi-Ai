@@ -15,6 +15,7 @@ EllaBrief is a document-grounded legal intelligence MVP. Uploaded documents are 
 10. Legal discovery is a separate Groq browser-search workflow using dedicated search models. Search snippets are discovery only. EllaBrief fetches the full source page before treating it as evidence. The legal-source comparison context includes only document clauses and risks that passed server-side quotation, document-ID and page verification.
 11. The historical Nigerian federal-law repository is a supplementary fallback when live search is unavailable. It is clearly labelled historical and cannot establish current law.
 12. Retrieved excerpts and metadata are compared with the document analysis using structured reasoning output. Currentness, commencement, repeal and amendment effect are never assumed from upload dates or snippets.
+13. Legal review receives only document findings whose quotation, stable document ID and page passed source verification. The overview and executive summary are navigation hints, not contract evidence. Model-proposed source IDs are rejected unless every ID maps to a retrieved source. A finding cannot claim current law unless every cited source is explicitly marked currentness-verified by the retrieval layer; current live-search and historical fallback sources currently do not provide that guarantee.
 
 ## Provider and cost boundaries
 - Gemini is not used for analysis, chat or legal reasoning; it is OCR-only.
