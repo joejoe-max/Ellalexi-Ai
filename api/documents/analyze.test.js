@@ -30,13 +30,15 @@ describe("document analysis response validation", () => {
     const analysis = emptyAnalysis({
       clauses: [{
         heading: "Payment",
+        documentId: "doc-offer",
         documentName: "Offer.pdf",
-        page: "99",
+        page: "2",
         quote: "The Company shall pay the Contributor a monthly stipend of N50,000.",
         plainMeaning: "Monthly payment is promised."
       }]
     });
     verifyEvidence(analysis, [{
+      documentId: "doc-offer",
       name: "Offer.pdf",
       pages: [{ page: 2, text: "The Company shall pay the Contributor a monthly stipend of N50,000." }]
     }]);
@@ -51,20 +53,39 @@ describe("document analysis response validation", () => {
     const analysis = emptyAnalysis({
       clauses: [{
         heading: "Payment",
+        documentId: "missing-doc",
         documentName: "Other.pdf",
         page: "1",
         quote: "The company pays a contributor monthly for work performed."
       }, {
         heading: "Termination",
+        documentId: "doc-offer",
         documentName: "Offer.pdf",
-        page: "1",
-        quote: "Either party may terminate immediately without notice."
+        page: "99",
+        quote: "Either party may terminate this agreement by giving thirty days written notice."
       }]
     });
     verifyEvidence(analysis, [{
+      documentId: "doc-offer",
       name: "Offer.pdf",
       pages: [{ page: 1, text: "Either party may terminate this agreement by giving thirty days written notice." }]
     }]);
-    expect(analysis.clauses.map(item => item.evidenceStatus)).toEqual(["unverified", "unverified"]);
+    expect(analysis.clauses.map(item => item.evidenceStatus)).toEqual(["unverified", "page_mismatch"]);
   });
+  it("does not verify repeated filenames without a stable document ID", () => {
+    const analysis = emptyAnalysis({ clauses: [{ documentName: "Agreement.pdf", page: "1", quote: "The supplier shall deliver all goods by 1 June." }] });
+    verifyEvidence(analysis, [
+      { documentId: "doc-a", name: "Agreement.pdf", pages: [{ page: 1, text: "The supplier shall deliver all goods by 1 June." }] },
+      { documentId: "doc-b", name: "Agreement.pdf", pages: [{ page: 1, text: "The supplier shall deliver all goods by 1 June." }] }
+    ]);
+    expect(analysis.clauses[0].evidenceStatus).toBe("ambiguous_source");
+  });
+
+  it("keeps missing quotations visible as missing evidence", () => {
+    const analysis = emptyAnalysis({ clauses: [{ heading: "Payment", documentName: "Offer.pdf", quote: "" }] });
+    verifyEvidence(analysis, [{ documentId: "doc-offer", name: "Offer.pdf", pages: [] }]);
+    expect(analysis.clauses).toHaveLength(1);
+    expect(analysis.clauses[0].evidenceStatus).toBe("missing_evidence");
+  });
+
 });
