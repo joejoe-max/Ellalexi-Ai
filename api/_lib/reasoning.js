@@ -132,7 +132,7 @@ export async function generateWithFallback({
   let lastError;
   let fallbackTriggered = false;
   const outputTokens = Math.max(256, Number(generationConfig.maxOutputTokens || DEFAULT_OUTPUT_TOKENS));
-  for (const candidate of candidates) {
+  for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {\n    const candidate = candidates[candidateIndex];
     if (Number.isFinite(deadlineAt) && deadlineAt - Date.now() <= 0) {
       throw Object.assign(new Error("The shared processing deadline has expired."), { kind: "processing_deadline", httpStatus: 503 });
     }
@@ -170,7 +170,11 @@ export async function generateWithFallback({
           const classified = classifyReasoningError(response.status, payload);
           // A rejected Groq credential should bypass the remaining Groq models
           // and try the independently configured OpenRouter credential.
-          if (candidate.provider === "groq" && routerKey && classified.kind === "configuration") classified.retry = true;
+          if (candidate.provider === "groq" && routerKey && classified.kind === "configuration") {
+            classified.retry = true;
+            const routerIndex = candidates.findIndex(item => item.provider === "openrouter");
+            if (routerIndex >= 0) candidateIndex = routerIndex - 1;
+          }
           lastError = makeError(classified, candidate.provider, candidate.model, response.status, payload);
           safeLog(stage, candidate.provider, candidate.model, classified.kind);
           if (classified.kind === "json_validation" && candidate.provider === "groq" && attempt === 0) {
