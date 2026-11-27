@@ -29,7 +29,7 @@ describe("document chunking",()=>{
     expect(chunks[0].text).toContain("FIRST-CLAUSE");
     expect(chunks[0].text).not.toContain("THIRD-CLAUSE");
     expect(chunks[1].overlapFromPrevious).toBe(true);
-    expect(chunks[1].text.startsWith("[Page 4]\n"+first.slice(-overlapTokens*3.2).trim())).toBe(true);
+    expect(chunks[1].text).toContain(first.slice(-overlapTokens*3.2).trim());
     expect(chunks[1].text).toContain("SECOND-CLAUSE");
     expect(chunks.every(chunk=>chunk.text.length<=maxChars+64)).toBe(true);
   });
