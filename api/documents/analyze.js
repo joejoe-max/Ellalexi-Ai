@@ -201,7 +201,7 @@ export default async function handler(req, res) {
         });
         const parsed = JSON.parse(String(result.text || "").trim().replace(/^\x60\x60\x60(?:json)?\s*/i, "").replace(/\s*\x60\x60\x60$/, ""));
         analysis.crossDocumentFindings = validateCrossDocumentFindings(parsed.findings || [], comparison);
-      } catch (error) {
+      } catch {
         analysis.limitations.push("Cross-document comparison could not be completed; no cross-document conflict claims are included.");
       }
     } else if (documents.length > 1) {
