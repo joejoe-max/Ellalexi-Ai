@@ -2,6 +2,7 @@ import { searchLiveLegalSources } from "../../src/lib/liveLegalSearch.js";
 import {generateWithFallback} from "../_lib/reasoning.js";
 import {retrieveLegalSources} from "../../src/lib/legalSourceRetrieval.js";
 import {buildLegalReviewContext} from "../_lib/legalReviewContext.js";
+import {enforceLegalCurrentness} from "../_lib/legalSourceValidation.js";
 import {startSSE,sendEvent,endSSE,sendSafeError} from "../_lib/sse.js";
 
 const SCHEMA = { type:"OBJECT", properties:{
@@ -265,11 +266,13 @@ export default async function handler(req, res) {
           url: source.uri,
           provisionVerified,
           sourceStatus: source.status,
-          sourceAuthority: source.authority
+          sourceAuthority: source.authority,
+          currentnessVerified: source.currentnessVerified === true
         };
       }).filter(Boolean);
       return citations.length ? [{ ...f, citations }] : [];
     });
+    enforceLegalCurrentness(result);
 
     if (!result.findings.length) {
       sendEvent(res, "status", { message: "Preparing general legal principles for this document type…" });
