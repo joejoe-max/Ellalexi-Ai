@@ -1,7 +1,9 @@
 import { estimateRequestTokens } from "./tokenBudget.js";
 
 const DEFAULT_GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
-const OPENROUTER_MODEL = "openai/gpt-oss-120b:free";
+// OpenRouter maintains this router ID and selects an eligible free chat model dynamically.
+// The previous pinned GPT-OSS :free variant returned HTTP 404 at runtime.
+const OPENROUTER_MODEL = "openrouter/free";
 const DEFAULT_OUTPUT_TOKENS = 1000;
 
 export function getGroqReasoningModels() {
@@ -30,10 +32,24 @@ export function classifyReasoningError(status, payload = {}, cause) {
 
 export function classifyProviderPayload(payload) {
   const choice = payload?.choices?.[0];
-  if (choice?.finish_reason === "length") return { kind: "truncated_response", detail: "finish_reason_length" };
-  const text = choice?.message?.content;
-  if (typeof text !== "string" || !text.trim()) return { kind: "empty_response", detail: "missing_content" };
-  return { kind: "ok" };
+  const message = choice?.message;
+  const content = message?.content;
+  const diagnostics = {
+    choiceCount: Array.isArray(payload?.choices) ? payload.choices.length : 0,
+    finishReason: choice?.finish_reason || null,
+    messageContentType: Array.isArray(content) ? "array" : typeof content,
+    messageContentLength: typeof content === "string" ? content.length : null,
+    reasoningContentLength: typeof message?.reasoning === "string" ? message.reasoning.length : null,
+    refusalPresent: Boolean(message?.refusal),
+    toolCallCount: Array.isArray(message?.tool_calls) ? message.tool_calls.length : 0,
+    promptTokens: Number(payload?.usage?.prompt_tokens || 0) || null,
+    completionTokens: Number(payload?.usage?.completion_tokens || 0) || null
+  };
+  if (choice?.finish_reason === "length") return { kind: "truncated_response", detail: "finish_reason_length", diagnostics };
+  if (typeof content !== "string" || !content.trim()) {
+    return { kind: "empty_response", detail: !choice ? "missing_choice" : "missing_content", diagnostics };
+  }
+  return { kind: "ok", diagnostics };
 }
 
 function toMessages(parts = [], systemInstruction) {
@@ -92,6 +108,25 @@ function safeLog(stage, provider, model, kind, details = {}) {
     ...details
   });
 }
+function safeCauseDetails(cause) {
+  const name = String(cause?.name || "Error").slice(0, 80);
+  const code = String(cause?.code || cause?.cause?.code || "").slice(0, 80) || null;
+  const kind = cause?.kind || null;
+  const messageByKind = {
+    timeout: "Provider request timed out",
+    network_error: "Provider network request failed",
+    empty_response: "Provider returned no usable assistant content",
+    truncated_response: "Provider output reached its token limit",
+    invalid_response: "Application validation rejected provider output",
+    provider_error: "Provider request failed"
+  };
+  return {
+    errorName: name,
+    errorCode: code,
+    errorKind: kind,
+    errorSummary: messageByKind[kind] || (cause instanceof TypeError ? "Network/fetch failure" : "Provider request failed")
+  };
+}
 function rateLimitHeaders(headers) {
   if (!headers?.get) return {};
   const names = [
@@ -117,6 +152,7 @@ function parseContent(payload) {
     error.name = result.kind === "empty_response" ? "EmptyResponseError" : "Error";
     error.kind = result.kind;
     error.retry = true;
+    error.responseDiagnostics = result.diagnostics;
     throw error;
   }
   return payload.choices[0].message.content;
@@ -212,7 +248,11 @@ export async function generateWithFallback({
               kind: "invalid_response", retry: true, provider: candidate.provider,
               model: candidate.model, httpStatus: 502
             });
-            safeLog(stage, candidate.provider, candidate.model, "invalid_response");
+            safeLog(stage, candidate.provider, candidate.model, "invalid_response", {
+              ...safeCauseDetails(cause),
+              ...classifyProviderPayload(payload).diagnostics,
+              validationErrorName: String(cause?.name || "Error").slice(0, 80)
+            });
             if (attempt === 0 && jsonMode === "schema") {
               jsonMode = "object";
               continue;
@@ -243,7 +283,12 @@ export async function generateWithFallback({
           const classified = classifyReasoningError(0, {}, cause);
           lastError = makeError({ ...classified, retry: cause?.retry ?? classified.retry }, candidate.provider, candidate.model, 0, {});
         }
-        safeLog(stage, candidate.provider, candidate.model, lastError.kind || "provider_error");
+        safeLog(stage, candidate.provider, candidate.model, lastError.kind || "provider_error", {
+          ...safeCauseDetails(cause),
+          providerStatus: lastError.providerStatus || null,
+          providerCode: lastError.providerCode || null,
+          ...(cause?.responseDiagnostics || {})
+        });
         if (!lastError.retry) throw lastError;
         break;
       }
@@ -340,7 +385,12 @@ export async function streamWithFallback({
     } catch (cause) {
       if (emitted) throw Object.assign(new Error("The response stream was interrupted."), { kind: "stream_interrupted", httpStatus: 502, userMessage: "The response was interrupted. Please ask again; no partial answer was saved." });
       lastError = cause?.provider ? cause : Object.assign(new Error("The AI service could not complete the stream."), { ...classifyReasoningError(0, {}, cause), retry: true });
-      safeLog(stage, candidate.provider, candidate.model, lastError.kind || "stream_error");
+      safeLog(stage, candidate.provider, candidate.model, lastError.kind || "stream_error", {
+        ...safeCauseDetails(cause),
+        providerStatus: lastError.providerStatus || null,
+        providerCode: lastError.providerCode || null,
+        responseLength: emitted.length
+      });
     }
     if (emitted) throw Object.assign(new Error("The response stream was interrupted."), { kind: "stream_interrupted", httpStatus: 502 });
     if (index < candidates.length - 1) onFallback?.(candidates[index + 1].model);
