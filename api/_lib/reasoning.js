@@ -73,6 +73,8 @@ function normalizeJsonSchema(schema) {
     } else if (key === "items") result[key] = normalizeJsonSchema(value);
     else result[key] = value;
   }
+  // Strict Structured Outputs requires every object to reject undeclared keys.
+  if (result.type === "object" && !("additionalProperties" in result)) result.additionalProperties = false;
   return result;
 }
 function responseFormat(config = {}, mode = "schema") {
@@ -82,7 +84,7 @@ function responseFormat(config = {}, mode = "schema") {
     type: "json_schema",
     json_schema: {
       name: "ellabrief_response",
-      strict: false,
+      strict: true,
       schema: normalizeJsonSchema(config.responseSchema)
     }
   };
