@@ -18,7 +18,7 @@ export function retrieveStructuredEvidence(analysis,question,{maxTokens=2600,max
 export function retrieveSourcePassages(documents,question,{maxTokens=1800,maxPages=12}={}) {
  const queryTerms=[...new Set(terms(question))];
  const pages=(documents||[]).flatMap(doc=>(doc.pages||[]).map(page=>({documentName:doc.name,page:String(page.page),text:String(page.text||"")})));
- const ranked=pages.map(page=>({...page,relevance:score(page,queryTerms)})).filter(page=>page.text.trim()).sort((a,b)=>b.relevance-a.relevance);
+ const ranked=pages.map(page=>({...page,relevance:score(page,queryTerms)})).filter(page=>page.text.trim()&&(!queryTerms.length||page.relevance>0)).sort((a,b)=>b.relevance-a.relevance);
  const selected=[];let used=0;
  for(const page of ranked){if(selected.length>=maxPages)break;const text=page.text.slice(0,Math.max(0,(maxTokens-used)*3));if(!text)continue;const passage={documentName:page.documentName,page:page.page,text};const cost=estimateTokens(JSON.stringify(passage));if(used+cost>maxTokens)continue;selected.push(passage);used+=cost;}
  return {passages:selected,estimatedTokens:used,omitted:Math.max(0,ranked.length-selected.length)};
