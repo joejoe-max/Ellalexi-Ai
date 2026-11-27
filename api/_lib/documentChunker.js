@@ -4,22 +4,20 @@ const DEFAULT_OVERLAP_TOKENS = 180;
 export function estimateTokens(value) {
   const text = String(value || "");
   if (!text) return 0;
-  const words = text.trim().split(/\\s+/).filter(Boolean).length;
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
   return Math.ceil(Math.max(text.length / 3.5, words * 1.25));
 }
 
 function splitLongText(value, maxChars) {
   const pieces = [];
   let rest = String(value || "").trim();
-
   while (rest.length > maxChars) {
-    let cut = rest.lastIndexOf("\\n", maxChars);
+    let cut = rest.lastIndexOf("\n", maxChars);
     if (cut < maxChars * 0.55) {
       const sentenceCut = rest.lastIndexOf(". ", maxChars);
       if (sentenceCut >= maxChars * 0.55) cut = sentenceCut + 1;
     }
     if (cut < maxChars * 0.55) cut = maxChars;
-
     const piece = rest.slice(0, cut).trim();
     const next = rest.slice(cut).trim();
     if (!piece || next.length >= rest.length) {
@@ -30,15 +28,14 @@ function splitLongText(value, maxChars) {
       rest = next;
     }
   }
-
   if (rest) pieces.push(rest);
   return pieces;
 }
 
 /**
  * Split a document into bounded evidence sections. Source text appears once in
- * its owning chunk; the only repeated text is an explicit, bounded tail copied
- * from the immediately preceding chunk when a same-page split occurs.
+ * its owning chunk; only an explicit bounded tail is repeated at a same-page
+ * chunk boundary. Page provenance is retained for every segment.
  */
 export function chunkDocument(doc, options = {}) {
   const configuredTarget = Number(options.targetTokens);
@@ -60,9 +57,9 @@ export function chunkDocument(doc, options = {}) {
     const first = current[0].page;
     const last = current[current.length - 1].page;
     const text = current.map(item => {
-      const overlap = item.overlap ? item.overlap + "\\n" : "";
-      return `[Page ${item.page}]\\n${overlap}${item.text}`;
-    }).join("\\n\\n");
+      const overlap = item.overlap ? item.overlap + "\n" : "";
+      return "[Page " + item.page + "]\n" + overlap + item.text;
+    }).join("\n\n");
     chunks.push({
       documentId: doc.id || doc.name,
       documentName: doc.name,
@@ -91,18 +88,16 @@ export function chunkDocument(doc, options = {}) {
         }
       }
 
-      // A chunk that was flushed by the 90% threshold also needs context at
-      // the next same-page boundary. This is intentionally added once, here.
+      // A 90%-threshold flush leaves no current chunk to carry context. Add
+      // the previous piece once, and only for another piece on the same page.
       if (!current.length && index > 0 && !overlap && overlapChars > 0) {
         const previousPiece = pieces[index - 1];
         overlap = previousPiece.slice(-Math.min(overlapChars, Math.max(0, maxChars - piece.length - 24))).trim();
       }
 
-      const segmentChars = piece.length + overlap.length + 16;
-      if (segmentChars > maxChars && overlap) overlap = "";
+      if (piece.length + overlap.length + 16 > maxChars) overlap = "";
       current.push({ page: page.page, text: piece, overlap });
       currentChars += piece.length + overlap.length + 16;
-
       if (currentChars >= maxChars * 0.9 && index < pieces.length - 1) flush();
     }
   }
