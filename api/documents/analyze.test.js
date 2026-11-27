@@ -88,4 +88,32 @@ describe("document analysis response validation", () => {
     expect(analysis.clauses[0].evidenceStatus).toBe("missing_evidence");
   });
 
+  it("rejects incomplete finding objects and incorrect chunk provenance", () => {
+    const incomplete = emptyAnalysis({
+      clauses: [{ heading: "Payment", documentId: "doc-a", documentName: "Offer.pdf", page: "1", quote: "The buyer shall pay within thirty days.", plainMeaning: "Payment is due." }]
+    });
+    expect(() => cleanJson(JSON.stringify(incomplete))).toThrow(/practicalEffect/);
+
+    const wrongSource = emptyAnalysis({
+      clauses: [{
+        heading: "Payment", documentId: "doc-b", documentName: "Other.pdf", page: "1",
+        quote: "The buyer shall pay within thirty days.", plainMeaning: "Payment is due.",
+        practicalEffect: "The buyer must pay.", beneficiary: "Seller", consequences: "Late payment",
+        riskLevel: "medium", benefits: [], burdens: [], terminology: []
+      }]
+    });
+    expect(() => cleanJson(JSON.stringify(wrongSource), { documentId: "doc-a", documentName: "Offer.pdf" })).toThrow(/incorrect source document ID/);
+  });
+
+  it("rejects invalid enum values instead of rendering arbitrary model labels", () => {
+    const invalid = emptyAnalysis({
+      risks: [{
+        documentId: "doc-a", title: "Payment risk", severity: "critical-ish", whoAffected: "Buyer",
+        whyItMatters: "The payment deadline is unclear.", documentName: "Offer.pdf",
+        page: "1", quote: "Payment shall be made as agreed.", suggestedNextStep: "Clarify the date."
+      }]
+    });
+    expect(() => cleanJson(JSON.stringify(invalid))).toThrow(/invalid severity/);
+  });
+
 });
