@@ -14,6 +14,17 @@ const MAX_TOTAL = 25 * 1024 * 1024;
 const MAX_FILES = 5;
 const MAX_ANALYSIS_CHUNKS = 6;
 const PROCESSING_BUDGET_MS = 52_000;
+const MAX_DOCUMENT_TEXT = 120_000;
+
+function limitPages(pages, maxChars = MAX_DOCUMENT_TEXT) {
+  let remaining = maxChars;
+  return (pages || []).map(page => {
+    const source = String(page.text || "");
+    const text = source.slice(0, Math.max(0, remaining));
+    remaining -= text.length;
+    return { page: page.page, text };
+  });
+}
 
 const SCHEMA = {
   type: "OBJECT",
@@ -155,7 +166,7 @@ export default async function handler(req, res) {
         documentId: createDocumentId({ name, size: buffer.length, buffer }),
         name, type: isPdf ? "PDF" : "DOCX",
         text: extracted.text,
-        pages: isPdf ? extracted.pages : [{ page: "not available", text: extracted.text }],
+        pages: isPdf ? limitPages(extracted.pages) : [{ page: "not available", text: extracted.text }],
         pageCount: extracted.pageCount,
         truncated: Boolean(extracted.truncated),
         readingMethod: extracted.readingMethod || (isPdf ? "pdf_text" : "mammoth_text"),
