@@ -1,12 +1,7 @@
-import {
-  estimateRequestTokens,
-  reserveTokenBudget,
-  releaseTokenBudget,
-  settleTokenBudget
-} from "./tokenBudget.js";
+import { estimateRequestTokens } from "./tokenBudget.js";
 
 const DEFAULT_GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
-const OPENROUTER_MODEL = "openrouter/free";
+const OPENROUTER_MODEL = "openai/gpt-oss-120b:free";
 const DEFAULT_OUTPUT_TOKENS = 1000;
 const unique = values => [...new Set(values.filter(Boolean))];
 
@@ -93,8 +88,21 @@ function makeBody({ model, messages, generationConfig = {}, jsonMode = "schema" 
   if (model.includes("gpt-oss")) body.reasoning_effort = "low";
   return body;
 }
-function safeLog(stage, provider, model, kind) {
-  console.info("[ellabrief-reasoning]", { stage: String(stage || "reasoning").slice(0, 50), provider, model, kind });
+function safeLog(stage, provider, model, kind, details = {}) {
+  // Never log prompts, document text, API keys, or provider response bodies.
+  console.info("[ellabrief-reasoning]", {
+    stage: String(stage || "reasoning").slice(0, 50), provider, model, kind,
+    ...details
+  });
+}
+function rateLimitHeaders(headers) {
+  if (!headers?.get) return {};
+  const names = [
+    "retry-after", "x-ratelimit-limit-requests", "x-ratelimit-limit-tokens",
+    "x-ratelimit-remaining-requests", "x-ratelimit-remaining-tokens",
+    "x-ratelimit-reset-requests", "x-ratelimit-reset-tokens"
+  ];
+  return Object.fromEntries(names.map(name => [name, headers.get(name)]).filter(([, value]) => value !== null));
 }
 function makeError(classified, provider, model, status, payload) {
   const error = new Error(classified.message);
@@ -150,20 +158,15 @@ export async function generateWithFallback({
       throw Object.assign(new Error("The shared processing deadline has expired."), { kind: "processing_deadline", httpStatus: 503 });
     }
     const estimate = estimateRequestTokens(messages, outputTokens);
-    const budget = candidate.provider === "groq"
-      ? reserveTokenBudget({ key: "groq", tokens: estimate, limit: Number(process.env.GROQ_LOCAL_TPM_BUDGET || 14000) })
-      : { allowed: true };
-    if (!budget.allowed) {
-      lastError = Object.assign(new Error("The local Groq token budget is exhausted."), { kind: "local_token_budget", retry: true });
-      fallbackTriggered = true;
-      onFallback?.(candidate.model);
-      continue;
-    }
+    // No in-memory TPM preflight: Vercel instances do not share state.
+    // Groq's organization-level limits and response headers are authoritative.
+    safeLog(stage, candidate.provider, candidate.model, "attempt", {
+      attempt: candidateIndex + 1, estimatedTokens: estimate, outputTokenLimit: outputTokens
+    });
     let jsonMode = "schema";
     for (let attempt = 0; attempt < (generationConfig.responseMimeType === "application/json" ? 2 : 1); attempt++) {
       const remaining = Number.isFinite(deadlineAt) ? deadlineAt - Date.now() : timeout;
       if (remaining <= 0) {
-        if (budget.reservation) releaseTokenBudget({ key: "groq", reservation: budget.reservation });
         throw Object.assign(new Error("The shared processing deadline has expired."), { kind: "processing_deadline", httpStatus: 503 });
       }
       const requestTimeout = Math.max(1, Math.min(timeout, remaining));
@@ -189,12 +192,16 @@ export async function generateWithFallback({
             if (routerIndex >= 0) candidateIndex = routerIndex - 1;
           }
           lastError = makeError(classified, candidate.provider, candidate.model, response.status, payload);
-          safeLog(stage, candidate.provider, candidate.model, classified.kind);
+          safeLog(stage, candidate.provider, candidate.model, classified.kind, {
+            status: response.status,
+            providerCode: String(payload?.error?.code || payload?.error?.type || "").slice(0, 80) || null,
+            responseLength: 0,
+            rateLimits: rateLimitHeaders(response.headers)
+          });
           if (["json_validation", "unsupported_format"].includes(classified.kind) && attempt === 0) {
             jsonMode = "object";
             continue;
           }
-          if (budget.reservation) releaseTokenBudget({ key: "groq", reservation: budget.reservation });
           if (!classified.retry) throw lastError;
           break;
         }
@@ -213,12 +220,20 @@ export async function generateWithFallback({
               jsonMode = "object";
               continue;
             }
-            if (budget.reservation) releaseTokenBudget({ key: "groq", reservation: budget.reservation });
             break;
           }
         }
         const usage = actualTokens(payload, estimate);
-        if (budget.reservation) settleTokenBudget({ key: "groq", reservation: budget.reservation, actualTokens: usage });
+        safeLog(stage, candidate.provider, candidate.model, "success", {
+          status: response.status,
+          estimatedTokens: estimate,
+          promptTokens: Number(payload?.usage?.prompt_tokens || 0) || null,
+          completionTokens: Number(payload?.usage?.completion_tokens || 0) || null,
+          totalTokens: usage,
+          responseLength: text.length,
+          finishReason: payload.choices?.[0]?.finish_reason || "stop",
+          rateLimits: rateLimitHeaders(response.headers)
+        });
         return {
           provider: candidate.provider, model: candidate.model, text, payload,
           finishReason: payload.choices?.[0]?.finish_reason || "stop",
