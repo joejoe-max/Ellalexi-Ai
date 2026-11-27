@@ -65,7 +65,7 @@ it("records provider response shape without logging reasoning content",async()=>
   await expect(generateWithFallback({parts:[],fetchImpl})).rejects.toMatchObject({kind:"empty_response"});
   spy.mockRestore();
   const dumped=JSON.stringify(logs);
-  expect(dumped).toContain("missing_content");
+  expect(dumped).toContain("empty_response");
   expect(dumped).toContain("reasoningContentLength");
   expect(dumped).not.toContain("private reasoning");
 });
