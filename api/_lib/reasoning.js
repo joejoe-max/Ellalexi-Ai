@@ -1,13 +1,15 @@
 import { estimateRequestTokens, inspectTokenBudget, reserveTokenBudget } from "./tokenBudget.js";
 
 const DEFAULT_GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
+const DEFAULT_OPENROUTER_MODELS = ["openrouter/free"];
 const DEFAULT_OUTPUT_TOKENS = 1000;
 const MIN_GROQ_OUTPUT_TOKENS = 256;
 
 const unique = items => [...new Set(items.filter(Boolean))];
-const configured = (value, fallback) => {
+const configured = (value, fallback = []) => {
   const list = unique(String(value || "").split(",").map(item => item.trim()));
-  return list.length ? list : fallback;
+  const defaults = Array.isArray(fallback) ? fallback : [fallback];
+  return list.length ? list : unique(defaults.map(item => String(item || "").trim()));
 };
 
 export function getGroqReasoningModels() {
@@ -15,7 +17,7 @@ export function getGroqReasoningModels() {
 }
 
 export function getOpenRouterModels() {
-  return configured(process.env.OPENROUTER_MODELS || process.env.OPENROUTER_MODEL, "openrouter/free").slice(0, 4);
+  return configured(process.env.OPENROUTER_MODELS || process.env.OPENROUTER_MODEL, DEFAULT_OPENROUTER_MODELS).slice(0, 4);
 }
 
 export function getOpenRouterModel() {
