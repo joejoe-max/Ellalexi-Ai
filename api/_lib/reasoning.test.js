@@ -1,6 +1,7 @@
 import{describe,it,expect,vi,afterEach}from"vitest";
 import{generateWithFallback,streamWithFallback,getGroqReasoningModels,classifyReasoningError}from"./reasoning.js";
 import{resetTokenBudgets}from"./tokenBudget.js";
+import{resetTokenBudgets}from"./tokenBudget.js";
 describe("Groq-first reasoning failover",()=>{afterEach(()=>{vi.unstubAllEnvs();resetTokenBudgets();});
 it("uses configured Groq model order",()=>{vi.stubEnv("GROQ_REASONING_MODELS","model-a,model-b,model-a");expect(getGroqReasoningModels()).toEqual(["model-a","model-b"])});
 it("classifies provider rate limits and model errors",()=>{expect(classifyReasoningError(429).retry).toBe(true);expect(classifyReasoningError(404).kind).toBe("model_unavailable");expect(classifyReasoningError(400).retry).toBe(false)});
