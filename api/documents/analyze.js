@@ -1,1 +1,1 @@
-PLACEHOLDER
+SEE_LOCAL:/home/workdir/artifacts/analyze_good.js
