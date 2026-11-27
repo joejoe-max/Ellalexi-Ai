@@ -3,17 +3,18 @@ import {buildCrossDocumentEvidence,mergeCrossDocumentFindings,mergeSectionAnalys
 
 describe("cross-document evidence preparation",()=>{
   it("preserves exact source document names, pages and quotes",()=>{
-    const result=buildCrossDocumentEvidence({clauses:[{documentName:"A.pdf",page:"4",quote:"Exact wording",heading:"IP ownership",evidenceStatus:"verified"}]});
+    const result=buildCrossDocumentEvidence({clauses:[{documentId:"doc-a",documentName:"A.pdf",page:"4",quote:"Exact wording",heading:"IP ownership",evidenceStatus:"verified"}]});
     expect(result.evidence.clauses[0]).toMatchObject({documentName:"A.pdf",page:"4",quote:"Exact wording"});
+    expect(result.documentIds).toEqual(["doc-a"]);
     expect(result.documentNames).toEqual(["A.pdf"]);
   });
   it("excludes quotes that were not verified against their uploaded source",()=>{
-    const result=buildCrossDocumentEvidence({clauses:[{documentName:"A.pdf",page:"4",quote:"Unverified source wording"}]});
+    const result=buildCrossDocumentEvidence({clauses:[{documentId:"doc-a",documentName:"A.pdf",page:"4",quote:"Unverified source wording"}]});
     expect(result.documentNames).toEqual([]);
     expect(result.omitted).toBe(1);
   });
   it("bounds comparison evidence and records omitted items",()=>{
-    const result=buildCrossDocumentEvidence({clauses:Array.from({length:100},(_,i)=>({documentName:"A.pdf",page:String(i),quote:"Some contractual wording ".repeat(10),evidenceStatus:"verified"}))},{maxTokens:500});
+    const result=buildCrossDocumentEvidence({clauses:Array.from({length:100},(_,i)=>({documentId:"doc-a",documentName:"A.pdf",page:String(i),quote:"Some contractual wording ".repeat(10),evidenceStatus:"verified"}))},{maxTokens:500});
     expect(result.estimatedTokens).toBeLessThanOrEqual(500);
     expect(result.omitted).toBeGreaterThan(0);
   });
@@ -75,18 +76,19 @@ describe("document narrative consolidation",()=>{
 describe("cross-document claim validation",()=>{
   const comparison=buildCrossDocumentEvidence({
     clauses:[
-      {documentName:"A.pdf",page:"2",quote:"The supplier shall deliver all goods by 1 June.",evidenceStatus:"verified"},
-      {documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June.",evidenceStatus:"verified"}
+      {documentId:"doc-a",documentName:"A.pdf",page:"2",quote:"The supplier shall deliver all goods by 1 June.",evidenceStatus:"verified"},
+      {documentId:"doc-b",documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June.",evidenceStatus:"verified"}
     ]
   });
   it("accepts a finding only with two known documents and matching quotes from both",()=>{
     const findings=validateCrossDocumentFindings([{
       finding:"The delivery deadlines differ between the two agreements.",
       documents:["A.pdf","B.pdf"],
+      documentIds:["doc-a","doc-b"],
       significance:"Potential timing conflict",
       evidence:[
-        {documentName:"A.pdf",page:"2",quote:"The supplier shall deliver all goods by 1 June."},
-        {documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June."}
+        {documentId:"doc-a",documentName:"A.pdf",page:"2",quote:"The supplier shall deliver all goods by 1 June."},
+        {documentId:"doc-b",documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June."}
       ]
     }],comparison);
     expect(findings).toHaveLength(1);
@@ -94,11 +96,11 @@ describe("cross-document claim validation",()=>{
   });
   it("rejects one-document, unknown-document and invented-quote claims",()=>{
     const findings=validateCrossDocumentFindings([
-      {finding:"This is a one-document claim only.",documents:["A.pdf"],evidence:[]},
-      {finding:"This names an unuploaded agreement.",documents:["A.pdf","Other.pdf"],evidence:[]},
-      {finding:"This alleges a conflict without source evidence.",documents:["A.pdf","B.pdf"],evidence:[
-        {documentName:"A.pdf",quote:"Invented wording that is not in the agreement"},
-        {documentName:"B.pdf",quote:"Also invented wording that is not in the agreement"}
+      {finding:"This is a one-document claim only.",documents:["A.pdf"],documentIds:["doc-a"],evidence:[]},
+      {finding:"This names an unuploaded agreement.",documents:["A.pdf","Other.pdf"],documentIds:["doc-a","unknown"],evidence:[]},
+      {finding:"This alleges a conflict without source evidence.",documents:["A.pdf","B.pdf"],documentIds:["doc-a","doc-b"],evidence:[
+        {documentId:"doc-a",documentName:"A.pdf",quote:"Invented wording that is not in the agreement"},
+        {documentId:"doc-b",documentName:"B.pdf",quote:"Also invented wording that is not in the agreement"}
       ]}
     ],comparison);
     expect(findings).toEqual([]);
@@ -107,9 +109,10 @@ describe("cross-document claim validation",()=>{
     expect(validateCrossDocumentFindings([{
       finding:"The delivery deadlines differ between the two agreements.",
       documents:["A.pdf","B.pdf"],
+      documentIds:["doc-a","doc-b"],
       evidence:[
-        {documentName:"A.pdf",page:"99",quote:"The supplier shall deliver all goods by 1 June."},
-        {documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June."}
+        {documentId:"doc-a",documentName:"A.pdf",page:"99",quote:"The supplier shall deliver all goods by 1 June."},
+        {documentId:"doc-b",documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June."}
       ]
     }],comparison)).toEqual([]);
   });
@@ -117,7 +120,8 @@ describe("cross-document claim validation",()=>{
     expect(validateCrossDocumentFindings([{
       finding:"A comparison without citations for both sides.",
       documents:["A.pdf","B.pdf"],
-      evidence:[{documentName:"A.pdf",quote:"The supplier shall deliver all goods by 1 June."}]
+      documentIds:["doc-a","doc-b"],
+      evidence:[{documentId:"doc-a",documentName:"A.pdf",quote:"The supplier shall deliver all goods by 1 June."}]
     }],comparison)).toEqual([]);
   });
 });
