@@ -272,10 +272,15 @@ export async function streamWithFallback({
     const remaining = Number.isFinite(deadlineAt) ? deadlineAt - Date.now() : timeout;
     if (remaining <= 0) throw Object.assign(new Error("The shared processing deadline has expired."), { kind: "processing_deadline", httpStatus: 503 });
     let emitted = "";
+    safeLog(stage, candidate.provider, candidate.model, "stream_attempt", { attempt: index + 1 });
     try {
       const response = await fetchImpl(candidate.url, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + candidate.key },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + candidate.key,
+          ...(candidate.provider === "openrouter" ? { "HTTP-Referer": process.env.APP_URL || "https://ellabrief.com", "X-Title": "EllaBrief" } : {})
+        },
         body: JSON.stringify({ ...makeBody({ ...candidate, messages, generationConfig }), stream: true }),
         signal: AbortSignal.timeout(Math.min(timeout, remaining))
       });
@@ -283,7 +288,12 @@ export async function streamWithFallback({
         const payload = await response.json().catch(() => ({}));
         const classified = classifyReasoningError(response.status, payload);
         lastError = makeError(classified, candidate.provider, candidate.model, response.status, payload);
-        safeLog(stage, candidate.provider, candidate.model, classified.kind);
+        safeLog(stage, candidate.provider, candidate.model, classified.kind, {
+          status: response.status,
+          providerCode: String(payload?.error?.code || payload?.error?.type || "").slice(0, 80) || null,
+          responseLength: 0,
+          rateLimits: rateLimitHeaders(response.headers)
+        });
         if (!classified.retry) throw lastError;
       } else if (!response.body) {
         throw Object.assign(new Error("The provider returned no stream."), { kind: "empty_response", retry: true });
@@ -319,12 +329,19 @@ export async function streamWithFallback({
           buffer += decoder.decode();
           if (buffer.trim()) consume(buffer);
         } finally { reader.releaseLock(); }
-        if (emitted.trim()) return { provider: candidate.provider, model: candidate.model, text: emitted };
+        if (emitted.trim()) {
+          safeLog(stage, candidate.provider, candidate.model, "stream_success", {
+            status: response.status, responseLength: emitted.length,
+            rateLimits: rateLimitHeaders(response.headers)
+          });
+          return { provider: candidate.provider, model: candidate.model, text: emitted };
+        }
         lastError = Object.assign(new Error("The provider returned an empty stream."), { kind: "empty_response", retry: true });
       }
     } catch (cause) {
       if (emitted) throw Object.assign(new Error("The response stream was interrupted."), { kind: "stream_interrupted", httpStatus: 502, userMessage: "The response was interrupted. Please ask again; no partial answer was saved." });
       lastError = cause?.provider ? cause : Object.assign(new Error("The AI service could not complete the stream."), { ...classifyReasoningError(0, {}, cause), retry: true });
+      safeLog(stage, candidate.provider, candidate.model, lastError.kind || "stream_error");
     }
     if (emitted) throw Object.assign(new Error("The response stream was interrupted."), { kind: "stream_interrupted", httpStatus: 502 });
     if (index < candidates.length - 1) onFallback?.(candidates[index + 1].model);
