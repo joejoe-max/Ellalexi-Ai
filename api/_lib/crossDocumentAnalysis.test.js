@@ -45,6 +45,16 @@ describe("cross-document evidence preparation",()=>{
       [{finding:"Conflict",documents:["B","A"],significance:"High"}]
     )).toHaveLength(1);
   });
+  it("keeps same-filename uploads separate by stable document ID", () => {
+    const result = buildCrossDocumentEvidence({ clauses: [
+      { documentId:"doc-a",documentName:"Agreement.pdf",documentLabel:"Agreement.pdf",page:"1",quote:"The first party shall pay within thirty days.",evidenceStatus:"verified" },
+      { documentId:"doc-b",documentName:"Agreement.pdf",documentLabel:"Agreement.pdf (upload 2)",page:"1",quote:"The second party shall pay within sixty days.",evidenceStatus:"verified" }
+    ]});
+    expect(result.documentIds).toEqual(["doc-a","doc-b"]);
+    expect(result.evidenceByDocument["doc-a"]).toHaveLength(1);
+    expect(result.evidenceByDocument["doc-b"]).toHaveLength(1);
+  });
+
 });
 
 describe("document narrative consolidation",()=>{
@@ -116,6 +126,29 @@ describe("cross-document claim validation",()=>{
       ]
     }],comparison)).toEqual([]);
   });
+  it("rejects filename-only citations without stable document IDs", () => {
+    expect(validateCrossDocumentFindings([{
+      finding:"The delivery deadlines differ between the two agreements.",
+      documents:["A.pdf","B.pdf"],
+      evidence:[
+        {documentName:"A.pdf",page:"2",quote:"The supplier shall deliver all goods by 1 June."},
+        {documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June."}
+      ]
+    }],comparison)).toEqual([]);
+  });
+
+  it("requires the comparison quote to match the verified source quote exactly", () => {
+    expect(validateCrossDocumentFindings([{
+      finding:"The delivery deadlines differ between the two agreements.",
+      documents:["A.pdf","B.pdf"],
+      documentIds:["doc-a","doc-b"],
+      evidence:[
+        {documentId:"doc-a",documentName:"A.pdf",page:"2",quote:"The supplier shall deliver all goods."},
+        {documentId:"doc-b",documentName:"B.pdf",page:"5",quote:"Delivery shall occur no later than 15 June."}
+      ]
+    }],comparison)).toEqual([]);
+  });
+
   it("rejects unsupported or incomplete citations",()=>{
     expect(validateCrossDocumentFindings([{
       finding:"A comparison without citations for both sides.",
