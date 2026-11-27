@@ -58,19 +58,48 @@ function parse(req) {
   const form = formidable({ multiples: true, maxFiles: MAX_FILES, maxFileSize: MAX_FILE, maxTotalFileSize: MAX_TOTAL, allowEmptyFiles: false, minFileSize: 1, keepExtensions: true });
   return new Promise((resolve, reject) => form.parse(req, (error, fields, files) => error ? reject(error) : resolve(files)));
 }
-export function cleanJson(raw) {
+export function cleanJson(raw, expectedDocument) {
   const value = String(raw || "").trim().replace(/^\x60\x60\x60(?:json)?\s*/i, "").replace(/\s*\x60\x60\x60$/, "");
   const parsed = JSON.parse(value);
   const result = parsed?.analysis && typeof parsed.analysis === "object" ? parsed.analysis : parsed?.result && typeof parsed.result === "object" ? parsed.result : parsed;
   if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error("Analysis response is not an object.");
-  const arrays = ["parties", "clauses", "rightsAndObligations", "risks", "moneyMatters", "missingProtections", "questions", "crossDocumentFindings", "limitations"];
-  for (const field of arrays) {
-    if (!Array.isArray(result[field])) throw new Error("Analysis field is missing or malformed: " + field);
-  }
+
+  const arrays = ["parties","clauses","rightsAndObligations","risks","moneyMatters","missingProtections","questions","crossDocumentFindings","limitations"];
+  for (const field of arrays) if (!Array.isArray(result[field])) throw new Error("Analysis field is missing or malformed: " + field);
   if (typeof result.documentOverview !== "string" || !result.documentOverview.trim()) throw new Error("Analysis overview is missing.");
   if (typeof result.executiveSummary !== "string" || !result.executiveSummary.trim()) throw new Error("Analysis summary is missing.");
+
+  const requireObjectFields = (group, fields) => {
+    for (const [index, item] of result[group].entries()) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(group + "[" + index + "] is not an object.");
+      for (const field of fields) if (typeof item[field] !== "string" || !item[field].trim()) throw new Error(group + "[" + index + "] is missing " + field + ".");
+      if (expectedDocument && ["clauses","rightsAndObligations","risks","moneyMatters"].includes(group)) {
+        if (item.documentId !== expectedDocument.documentId) throw new Error(group + "[" + index + "] has an incorrect source document ID.");
+        if (item.documentName !== expectedDocument.documentName) throw new Error(group + "[" + index + "] has an incorrect source document name.");
+      }
+    }
+  };
+  requireObjectFields("parties",["name","role","source"]);
+  requireObjectFields("clauses",["heading","documentId","documentName","page","quote","plainMeaning","practicalEffect","beneficiary","consequences","riskLevel"]);
+  requireObjectFields("rightsAndObligations",["documentId","party","kind","description","documentName","page","quote"]);
+  requireObjectFields("risks",["documentId","title","severity","whoAffected","whyItMatters","documentName","page","quote","suggestedNextStep"]);
+  requireObjectFields("moneyMatters",["documentId","item","amount","frequency","documentName","page","quote","notes"]);
+  requireObjectFields("missingProtections",["protection","whyItMatters","scope"]);
+  requireObjectFields("questions",["question","reason","documentName","page"]);
+
+  for (const [index, item] of result.clauses.entries()) {
+    if (!Array.isArray(item.benefits) || !Array.isArray(item.burdens) || !Array.isArray(item.terminology)) throw new Error("clauses[" + index + "] has malformed detail arrays.");
+    if (!["high","medium","low","unclear"].includes(item.riskLevel)) throw new Error("clauses[" + index + "] has an invalid risk level.");
+    for (const term of item.terminology) if (!term || ["term","meaning","effectInThisClause"].some(key => typeof term[key] !== "string" || !term[key].trim())) throw new Error("clauses[" + index + "] has malformed terminology.");
+  }
+  for (const [index, item] of result.risks.entries()) if (!["high","medium","low","unclear"].includes(item.severity)) throw new Error("risks[" + index + "] has an invalid severity.");
+  for (const [index, item] of result.rightsAndObligations.entries()) if (!["right","obligation","condition","restriction","unclear"].includes(item.kind)) throw new Error("rightsAndObligations[" + index + "] has an invalid kind.");
+
+  // Section-level passes may not claim cross-document comparisons.
+  result.crossDocumentFindings = [];
   return result;
 }
+
 const normaliseQuote = value => String(value || "")
   .normalize("NFKC")
   .replace(/\u00ad/g, "")
@@ -173,7 +202,7 @@ async function analyzeChunk(chunk, deadlineAt, index, total, onFallback) {
     timeout: Math.min(16000, remaining - 2500),
     deadlineAt,
     onFallback,
-    validateResponse: ({ text }) => cleanJson(text)
+    validateResponse: ({ text }) => cleanJson(text, { documentId: chunk.documentId, documentName: chunk.documentName })
   });
   return generated.validated;
 }
