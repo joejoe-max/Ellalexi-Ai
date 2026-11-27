@@ -73,12 +73,12 @@ export function cleanJson(raw) {
 }
 const normaliseQuote = value => String(value || "")
   .normalize("NFKC")
-  .replace(/\\xAD/g, "")
+  .replace(/\u00ad/g, "")
   .toLowerCase()
   .replace(/[“”]/g, '"')
   .replace(/[‘’]/g, "'")
-  .replace(/[^\\p{L}\\p{N}]+/gu, " ")
-  .replace(/\\s+/g, " ")
+  .replace(/[^\p{L}\p{N}]+/gu, " ")
+  .replace(/\s+/g, " ")
   .trim();
 
 function findSourceDocument(documents, item) {
