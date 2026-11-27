@@ -168,6 +168,9 @@ export async function generateWithFallback({
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
           const classified = classifyReasoningError(response.status, payload);
+          // A rejected Groq credential should bypass the remaining Groq models
+          // and try the independently configured OpenRouter credential.
+          if (candidate.provider === "groq" && routerKey && classified.kind === "configuration") classified.retry = true;
           lastError = makeError(classified, candidate.provider, candidate.model, response.status, payload);
           safeLog(stage, candidate.provider, candidate.model, classified.kind);
           if (classified.kind === "json_validation" && candidate.provider === "groq" && attempt === 0) {
