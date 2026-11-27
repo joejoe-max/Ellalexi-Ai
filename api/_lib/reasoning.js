@@ -1,4 +1,4 @@
-import { estimateRequestTokens, inspectTokenBudget, reserveTokenBudget } from "./tokenBudget.js";
+import { estimateRequestTokens, inspectTokenBudget, reserveTokenBudget, releaseTokenBudget } from "./tokenBudget.js";
 
 const DEFAULT_GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
 const DEFAULT_OPENROUTER_MODELS = ["openrouter/free"];
@@ -17,7 +17,8 @@ export function getGroqReasoningModels() {
 }
 
 export function getOpenRouterModels() {
-  return configured(process.env.OPENROUTER_MODELS || process.env.OPENROUTER_MODEL, DEFAULT_OPENROUTER_MODELS).slice(0, 4);
+  // Keep the fallback model in source control; no model-name environment variable is required.
+  return [...DEFAULT_OPENROUTER_MODELS];
 }
 
 export function getOpenRouterModel() {
@@ -148,7 +149,7 @@ function planGroqBudget({ requestMessages, format, requestedOutput }) {
   }
   const budget = reserveTokenBudget({ key: "groq", tokens: inputTokens + completionCap, limit });
   if (!budget.allowed) return { allowed: false, inputTokens, requested, retryAfterMs: budget.retryAfterMs };
-  return { allowed: true, inputTokens, completionCap };
+  return { allowed: true, inputTokens, completionCap, reservation: budget.reservation };
 }
 
 function usageOf(payload) {
@@ -189,11 +190,13 @@ async function request({ provider, model, parts, systemInstruction, generationCo
   const requestedOutput = Number(generationConfig.maxOutputTokens) > 0 ? Number(generationConfig.maxOutputTokens) : null;
   let promptTokenEstimate = estimateRequestTokens(requestMessages, 0);
   let completionTokenCap = requestedOutput;
+  let budgetReservation = null;
   if (provider === "groq") {
     const plan = planGroqBudget({ requestMessages, format, requestedOutput });
     promptTokenEstimate = plan.inputTokens ?? promptTokenEstimate;
     if (!plan.allowed) throw Object.assign(budgetError(model, plan), { formatMode, promptTokenEstimate });
     completionTokenCap = plan.completionCap;
+    budgetReservation = plan.reservation;
   }
   const body = {
     model,
@@ -213,13 +216,13 @@ async function request({ provider, model, parts, systemInstruction, generationCo
   try {
     response = await fetchImpl(base + "/chat/completions", { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(timeout) });
   } catch (cause) {
-    throw Object.assign(providerError(0, {}, cause, provider, model), { formatMode, promptTokenEstimate, completionTokenCap });
+    throw Object.assign(providerError(0, {}, cause, provider, model), { formatMode, promptTokenEstimate, completionTokenCap, budgetReservation });
   }
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw Object.assign(providerError(response.status, payload, null, provider, model), { formatMode, promptTokenEstimate, completionTokenCap });
+    throw Object.assign(providerError(response.status, payload, null, provider, model), { formatMode, promptTokenEstimate, completionTokenCap, budgetReservation });
   }
-  return { response, promptTokenEstimate, completionTokenCap, formatMode };
+  return { response, promptTokenEstimate, completionTokenCap, formatMode, budgetReservation };
 }
 
 function responseText(payload) {
@@ -230,12 +233,12 @@ function responseText(payload) {
 }
 
 async function generateFrom(options, provider, model, formatMode) {
-  const { response, promptTokenEstimate, completionTokenCap } = await request({ ...options, provider, model, formatMode, stream: false });
+  const { response, promptTokenEstimate, completionTokenCap, budgetReservation } = await request({ ...options, provider, model, formatMode, stream: false });
   let payload;
   try {
     payload = await response.json();
   } catch {
-    throw Object.assign(providerError(502, {}, Object.assign(new Error("Invalid provider response"), { name: "EmptyResponseError" }), provider, model), { formatMode, promptTokenEstimate, completionTokenCap });
+    throw Object.assign(providerError(502, {}, Object.assign(new Error("Invalid provider response"), { name: "EmptyResponseError" }), provider, model), { formatMode, promptTokenEstimate, completionTokenCap, budgetReservation });
   }
   const text = responseText(payload);
   if (!text.trim()) throw Object.assign(providerError(502, {}, Object.assign(new Error("Empty response"), { name: "EmptyResponseError" }), provider, model), { formatMode, promptTokenEstimate, completionTokenCap });
@@ -253,7 +256,8 @@ async function generateFrom(options, provider, model, formatMode) {
         finishReason,
         formatMode,
         promptTokenEstimate,
-        completionTokenCap
+        completionTokenCap,
+        budgetReservation
       });
     }
   }
@@ -331,6 +335,7 @@ async function runWithFallback(options, invoke) {
           });
           return { result: { ...result, attempt, fallbackTriggered, attempts } };
         } catch (error) {
+          if (error.budgetReservation) releaseTokenBudget({ key: "groq", reservation: error.budgetReservation });
           last = Object.assign(error, { formatMode: error.formatMode || formatMode });
           attempts.push({ provider, model, formatMode, kind: error.kind || "provider_error", providerStatus: error.providerStatus || null, providerCode: error.providerCode || null });
           logAttempt({
@@ -339,7 +344,7 @@ async function runWithFallback(options, invoke) {
             promptTokenEstimate: error.promptTokenEstimate ?? null, completionTokenCap: error.completionTokenCap ?? null,
             durationMs: Date.now() - started, fallbackTriggered, fallbackSucceeded: false
           });
-          if ((error.kind === "json_validation" || error.kind === "unsupported_format") && m < modes.length - 1) continue;
+          if (["json_validation", "unsupported_format", "invalid_response", "empty_response"].includes(error.kind) && m < modes.length - 1) continue;
           if (error.kind === "stream_interrupted") return { halt: true };
           if (!error.retry) return { stopModels: true };
           break;
