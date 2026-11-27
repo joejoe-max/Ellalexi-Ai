@@ -7,6 +7,7 @@ export function buildLegalReviewContext(analysis = {}) {
   return {
     documentOverview: String(analysis.documentOverview || "").slice(0, 3000),
     executiveSummary: String(analysis.executiveSummary || "").slice(0, 3000),
+    contextNote: "The overview and summary are model-generated navigation hints, not verified source evidence. Only clauses and risks listed below have passed source quotation, document identity and page verification. Do not treat unverified statements as contract facts.",
     clauses: (Array.isArray(analysis.clauses) ? analysis.clauses : [])
       .filter(verified).slice(0, 15).map(({ heading, plainMeaning, quote, documentId, documentName, documentLabel, page, benefits, terminology }) =>
         ({ heading, plainMeaning, quote, documentId, documentName: documentLabel || documentName, page, benefits, terminology })),
