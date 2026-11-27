@@ -37,6 +37,14 @@ function field(fields,key){const value=one(fields[key]);if(typeof value!=="strin
 /* eslint-disable no-control-regex */
 function clean(value){return String(value||"").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,"");}
 
+function questionTerms(question){return [...new Set(String(question||"").toLowerCase().match(/[a-z0-9]{3,}/g)||[])].filter(term=>!["the","and","for","that","this","with","from","what","which","does","about","into","are","you","can","will","have","has","its"].includes(term));}
+function retrieveRelevantEvidence(analysis,question,{maxItems=16,maxChars=14000}={}){
+ const terms=questionTerms(question);const groups=["crossDocumentFindings","clauses","rightsAndObligations","risks","moneyMatters","parties","missingProtections","questions"];const ranked=[];
+ for(const group of groups){for(const item of Array.isArray(analysis?.[group])?analysis[group]:[]){const text=JSON.stringify(item);const lower=text.toLowerCase();const score=terms.reduce((sum,term)=>sum+(lower.includes(term)?1:0),0)+(group==="crossDocumentFindings"?1:0);if(score>0)ranked.push({group,item,score});}}
+ ranked.sort((a,b)=>b.score-a.score);let used=0;const selected={};
+ for(const row of ranked){if(Object.values(selected).flat().length>=maxItems)break;const text=JSON.stringify(row.item);if(used+text.length>maxChars)continue;(selected[row.group] ||= []).push(row.item);used+=text.length;}
+ return {documentOverview:String(analysis.documentOverview||"").slice(0,1800),executiveSummary:String(analysis.executiveSummary||"").slice(0,1800),evidence:selected,limitations:(analysis.limitations||[]).slice(0,6),evidenceItems:Object.values(selected).reduce((n,a)=>n+a.length,0)};
+}
 function isLegalQuestion(question){
   return /\b(law|legal|sue|suing|sued|court|rights?|remed(y|ies)|enforce|breach|liable|liability|statute|act\b|cama|constitution|illegal|unlawful|red ?flag|protect(ion|ed)?|damages|injunction|arbitration|dispute)\b/i.test(question);
 }
@@ -66,22 +74,8 @@ export default async function handler(req,res){
    const text=String(extracted.text||"").slice(0,Math.max(0,MAX_TEXT-textChars));textChars+=text.length;
    if(text)parts.push({text:"ORIGINAL DOCUMENT: "+name+" ("+(pdf?"PDF":"DOCX")+")\n"+text});
   }
-  const context=JSON.stringify({
-    documentOverview:analysis.documentOverview,
-    executiveSummary:analysis.executiveSummary,
-    parties:analysis.parties,
-    clauses:analysis.clauses,
-    rightsAndObligations:analysis.rightsAndObligations,
-    risks:analysis.risks,
-    moneyMatters:analysis.moneyMatters,
-    missingProtections:analysis.missingProtections,
-    questions:analysis.questions,
-    crossDocumentFindings:analysis.crossDocumentFindings,
-    limitations:analysis.limitations,
-    legalReview
-  });
-  if(context.length>80000)throw Object.assign(new Error("This analysis is too large for follow-up. Ask a more specific question."),{userMessage:"This analysis is too large for follow-up. Ask a more specific question.",kind:"invalid_request"});
-
+  const context=JSON.stringify(retrieveRelevantEvidence(analysis,question));
+  if(context.length>18000)throw Object.assign(new Error("Relevant evidence is too large for follow-up."),{userMessage:"This question matches too much material. Narrow it to a particular clause, party or subject.",kind:"invalid_request"});
   let legalHint="";
   if(isSueQuestion(question)){
     legalHint="\n\nINSTRUCTION: This is a can-I-sue / enforcement question. Start with a clear direct answer (Yes, under ordinary Nigerian contract principles you can generally sue for breach of a binding agreement, subject to…). Then explain the conditions using THIS document. End with one short disclaimer line only. Do not add technical notes about structured review or source files.";
