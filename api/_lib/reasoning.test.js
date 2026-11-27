@@ -37,4 +37,34 @@ it("keeps ordinary bad requests terminal and does not call OpenRouter",async()=>
 it("classifies Groq JSON validation failures as retryable",()=>{expect(classifyReasoningError(400,{error:{code:"json_validate_failed",message:"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details."}})).toMatchObject({kind:"json_validation",retry:true});expect(classifyReasoningError(400).retry).toBe(false)});
 it("retries structured JSON on both Groq models before OpenRouter",async()=>{vi.stubEnv("GROQ_API_KEY","secret-groq-key");vi.stubEnv("OPENROUTER_API_KEY","secret-openrouter-key");const fetchImpl=vi.fn().mockResolvedValueOnce({ok:false,status:400,json:async()=>({error:{code:"json_validate_failed",message:"Failed to validate JSON."}})}).mockResolvedValueOnce({ok:false,status:400,json:async()=>({error:{code:"json_validate_failed",message:"Failed to validate JSON."}})}).mockResolvedValueOnce({ok:false,status:400,json:async()=>({error:{code:"json_validate_failed",message:"Failed to validate JSON."}})}).mockResolvedValueOnce({ok:false,status:400,json:async()=>({error:{code:"json_validate_failed",message:"Failed to validate JSON."}})}).mockResolvedValueOnce({ok:true,json:async()=>({choices:[{message:{content:JSON.stringify({ok:true})},finish_reason:"stop"}],usage:{prompt_tokens:20,completion_tokens:5}})});const logs=[];const spy=vi.spyOn(console,"info").mockImplementation((...args)=>logs.push(args));const result=await generateWithFallback({stage:"document_analysis",parts:[{text:"clause"}],generationConfig:{maxOutputTokens:400,responseMimeType:"application/json",responseSchema:{type:"OBJECT",properties:{ok:{type:"BOOLEAN"}},required:["ok"]}},fetchImpl});spy.mockRestore();expect(result).toMatchObject({provider:"openrouter",text:JSON.stringify({ok:true}),fallbackTriggered:true});const bodies=fetchImpl.mock.calls.map(call=>JSON.parse(call[1].body));expect(bodies[0].response_format.type).toBe("json_schema");expect(bodies[0].reasoning_effort).toBe("low");expect(bodies[1].response_format.type).toBe("json_object");expect(bodies[1].response_format.json_schema).toBeUndefined();expect(fetchImpl.mock.calls[4][0]).toContain("openrouter.ai");const dumped=JSON.stringify(logs);expect(dumped).not.toContain("secret-groq-key");expect(dumped).not.toContain("secret-openrouter-key");expect(dumped).toContain("document_analysis");expect(dumped).toContain("json_validation")});
 it("does not let legacy local token budgets block structured Groq requests",async()=>{vi.stubEnv("GROQ_API_KEY","g");vi.stubEnv("OPENROUTER_API_KEY","o");vi.stubEnv("GROQ_REASONING_MODELS","openai/gpt-oss-120b");vi.stubEnv("GROQ_LOCAL_TPM_BUDGET","5500");const fetchImpl=vi.fn().mockResolvedValueOnce({ok:true,json:async()=>({choices:[{message:{content:"Groq structured response"}}]})});await expect(generateWithFallback({parts:[{text:"x".repeat(2000)}],generationConfig:{maxOutputTokens:20000,responseSchema:{type:"OBJECT",properties:{ok:{type:"STRING"}},required:["ok"]}},fetchImpl})).resolves.toMatchObject({provider:"groq",text:"Groq structured response"});expect(fetchImpl.mock.calls[0][0]).toContain("api.groq.com")});
+it("classifies empty and truncated provider responses with safe shape diagnostics",()=>{
+  expect(classifyProviderPayload({choices:[{finish_reason:"length",message:{content:"partial"}}]})).toMatchObject({kind:"truncated_response",diagnostics:{finishReason:"length",messageContentLength:7}});
+  expect(classifyProviderPayload({choices:[{finish_reason:"stop",message:{content:null,reasoning:"internal"}}]})).toMatchObject({kind:"empty_response",detail:"missing_content",diagnostics:{reasoningContentLength:8,messageContentType:"object"}});
+});
+it("logs network failure metadata without secrets or document content",async()=>{
+  vi.stubEnv("GROQ_API_KEY","secret-groq-key");
+  const logs=[];
+  const spy=vi.spyOn(console,"info").mockImplementation((...args)=>logs.push(args));
+  const networkError=Object.assign(new TypeError("fetch failed"),{cause:{code:"ECONNRESET"}});
+  const fetchImpl=vi.fn().mockRejectedValue(networkError);
+  await expect(generateWithFallback({stage:"document_analysis",parts:[{text:"PRIVATE DOCUMENT TEXT"}],fetchImpl})).rejects.toMatchObject({kind:"network_error",provider:"groq"});
+  spy.mockRestore();
+  const dumped=JSON.stringify(logs);
+  expect(dumped).toContain("network_error");
+  expect(dumped).toContain("ECONNRESET");
+  expect(dumped).not.toContain("secret-groq-key");
+  expect(dumped).not.toContain("PRIVATE DOCUMENT TEXT");
+});
+it("records provider response shape without logging reasoning content",async()=>{
+  vi.stubEnv("GROQ_API_KEY","g");
+  const logs=[];
+  const spy=vi.spyOn(console,"info").mockImplementation((...args)=>logs.push(args));
+  const fetchImpl=vi.fn().mockResolvedValue({ok:true,status:200,headers:new Headers(),json:async()=>({choices:[{finish_reason:"stop",message:{content:null,reasoning:"private reasoning"}}]})});
+  await expect(generateWithFallback({parts:[],fetchImpl})).rejects.toMatchObject({kind:"empty_response"});
+  spy.mockRestore();
+  const dumped=JSON.stringify(logs);
+  expect(dumped).toContain("missing_content");
+  expect(dumped).toContain("reasoningContentLength");
+  expect(dumped).not.toContain("private reasoning");
+});
 });
