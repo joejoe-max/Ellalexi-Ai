@@ -241,7 +241,6 @@ export async function generateWithFallback({
           fallbackTriggered
         };
       } catch (cause) {
-        if (budget.reservation) releaseTokenBudget({ key: "groq", reservation: budget.reservation });
         if (cause?.provider) lastError = cause;
         else {
           const classified = classifyReasoningError(0, {}, cause);
