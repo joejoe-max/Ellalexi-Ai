@@ -31,3 +31,12 @@ EllaBrief is a document-grounded legal intelligence MVP. Uploaded documents are 
 - No legal conclusion is made without retrieved source text.
 - Currentness, commencement, repeal and amendment effect are not assumed.
 - Uploaded user documents are not added to the legal source corpus.
+
+## Document analysis integrity and execution limits
+
+- Each source page is split into bounded chunks. A small tail is repeated only at the start of the next chunk when a long page is split; overlap is never inserted into the middle of an already accumulated chunk. A real page boundary does not create artificial overlap.
+- Every chunk retains the exact uploaded filename and page range. Section-level passes analyse one section only and their cross-document claims are discarded during assembly.
+- Summary sections are joined with actual paragraph separators. Escaped newline sequences returned as text are normalized before the UI renders summaries with preserved whitespace.
+- Cross-document comparison is a separate final pass. A result is shown only if it names at least two distinct uploaded filenames and supplies an exact quote from each document that matches the extracted evidence included in that comparison. Unsupported names, one-document claims, and invented/mismatched quotes are rejected.
+- The current Vercel route is deliberately synchronous and has no durable job queue or shared job store. It therefore accepts at most six analysis sections and enforces one 52-second processing deadline shared across Groq/OpenRouter failover attempts. Larger uploads are rejected before AI analysis rather than being left to time out or returned partially. This is a safety bound, not background processing.
+- A future increase in document size requires durable asynchronous jobs: persist the job and section results, process with bounded concurrency and retry policy, expose progress, and assemble only after every required section is complete. Do not raise the section limit or rely on longer per-provider timeouts as a substitute.
