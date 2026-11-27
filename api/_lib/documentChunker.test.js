@@ -19,4 +19,18 @@ describe("document chunking",()=>{
     const chunks=buildAnalysisBatches([{name:"A",text:"Alpha clause."},{name:"B",text:"Beta clause."}]);
     expect(chunks.map(chunk=>chunk.documentName)).toEqual(["A","B"]);
   });
+  it("repeats overlap only after a chunk boundary",()=>{
+    const targetTokens=600;
+    const maxChars=Math.floor(targetTokens*3.2);
+    const head="Alpha clause wording. ".repeat(Math.ceil((maxChars*0.7)/22));
+    const tail="Beta obligation wording. ".repeat(Math.ceil(maxChars/24));
+    const chunks=chunkDocument({name:"Long.pdf",pages:[{page:4,text:head+"\n"+tail}]},{targetTokens,overlapTokens:40});
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks[0].text.includes("Beta obligation")).toBe(false);
+    expect(chunks[0].text.split("Alpha clause wording.").length-1).toBeLessThan(chunks[0].text.length);
+    const overlap=head.slice(-Math.floor(40*3.2)).trim();
+    expect(chunks[1].text.includes(overlap.slice(0,80))).toBe(true);
+    expect(chunks[1].text.includes("Beta obligation wording.")).toBe(true);
+    expect(chunks[1].startPage).toBe("4");
+  });
 });

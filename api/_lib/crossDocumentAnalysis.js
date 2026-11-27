@@ -29,6 +29,31 @@ export function buildCrossDocumentEvidence(analysis, options = {}) {
   return { evidence: output, estimatedTokens: used, omitted: GROUPS.reduce((sum,key)=>sum+(analysis?.[key]?.length||0)-(output[key]?.length||0),0) };
 }
 
+const SECTION_LISTS = ["parties","clauses","rightsAndObligations","risks","moneyMatters","missingProtections","questions","limitations"];
+
+/**
+ * Combine per-section analyses. Section passes do not see the other documents,
+ * so their cross-document claims are discarded and left for the comparison pass.
+ */
+export function mergeSectionAnalyses(sections = []) {
+  const usable = sections.filter(section => section && typeof section === "object" && !Array.isArray(section));
+  if (!usable.length) return null;
+  const merged = { ...usable[0], crossDocumentFindings: [] };
+  for (const key of SECTION_LISTS) merged[key] = [];
+  const overviews = [];
+  const summaries = [];
+  for (const section of usable) {
+    if (typeof section.documentOverview === "string" && section.documentOverview.trim()) overviews.push(section.documentOverview.trim());
+    if (typeof section.executiveSummary === "string" && section.executiveSummary.trim()) summaries.push(section.executiveSummary.trim());
+    for (const key of SECTION_LISTS) {
+      if (Array.isArray(section[key])) merged[key].push(...section[key]);
+    }
+  }
+  merged.documentOverview = overviews.join("\n\n");
+  merged.executiveSummary = summaries.join("\n\n");
+  return merged;
+}
+
 export function mergeCrossDocumentFindings(existing = [], additions = []) {
   const seen = new Set();
   return [...existing, ...additions].filter(item => {

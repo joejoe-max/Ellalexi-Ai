@@ -54,8 +54,11 @@ export function chunkDocument(doc, options = {}) {
     const pieces = splitLongText(page.text, maxChars);
     for (let i = 0; i < pieces.length; i++) {
       const piece = pieces[i];
-      const segment = i ? (pieces[i - 1].slice(-overlapChars) + "\n" + piece) : piece;
-      if (current.length && currentChars + segment.length > maxChars) flush();
+      // Overlap belongs on a chunk boundary only. Repeating the previous
+      // piece inside a chunk that already contains it duplicates clauses.
+      if (current.length && currentChars + piece.length > maxChars) flush();
+      const overlap = i > 0 && !current.length && overlapChars ? pieces[i - 1].slice(-overlapChars) + "\n" : "";
+      const segment = overlap + piece;
       current.push({ page: page.page, text: segment });
       currentChars += segment.length;
       if (currentChars >= maxChars * 0.9) flush();
