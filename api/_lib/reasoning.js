@@ -174,7 +174,7 @@ export async function generateWithFallback({
           headers: {
             "Content-Type": "application/json",
             Authorization: "Bearer " + candidate.key,
-            ...(candidate.provider === "openrouter" ? { "HTTP-Referer": process.env.APP_URL || "https://ellabrief.com", "X-Title": "EllaBrief" } : {})
+            ...(candidate.provider === "openrouter" ? { "HTTP-Referer": process.env.OPENROUTER_SITE_URL || process.env.APP_URL || "https://ellabrief.com", "X-Title": "EllaBrief" } : {})
           },
           body: JSON.stringify(makeBody({ ...candidate, messages, generationConfig, jsonMode })),
           signal: AbortSignal.timeout(requestTimeout)
@@ -279,7 +279,7 @@ export async function streamWithFallback({
         headers: {
           "Content-Type": "application/json",
           Authorization: "Bearer " + candidate.key,
-          ...(candidate.provider === "openrouter" ? { "HTTP-Referer": process.env.APP_URL || "https://ellabrief.com", "X-Title": "EllaBrief" } : {})
+          ...(candidate.provider === "openrouter" ? { "HTTP-Referer": process.env.OPENROUTER_SITE_URL || process.env.APP_URL || "https://ellabrief.com", "X-Title": "EllaBrief" } : {})
         },
         body: JSON.stringify({ ...makeBody({ ...candidate, messages, generationConfig }), stream: true }),
         signal: AbortSignal.timeout(Math.min(timeout, remaining))
