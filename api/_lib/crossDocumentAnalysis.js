@@ -80,12 +80,18 @@ export function validateCrossDocumentFindings(findings = [], comparison = {}) {
     for (const documentName of documents) {
       const citation = citations.find(entry => entry?.documentName === documentName);
       const quote = normalise(citation?.quote);
-      const sourceQuotes = (byDocument[documentName] || []).map(entry => normalise(entry.quote)).filter(Boolean);
-      if (quote.length < 12 || !sourceQuotes.some(source => source.includes(quote) || (quote.includes(source) && source.length >= 12))) {
+      const sourceEntries = byDocument[documentName] || [];
+      const page = String(citation?.page || "not available");
+      const matchedSource = sourceEntries.find(source => {
+        const sourceQuote = normalise(source.quote);
+        const pageMatches = String(source.page || "not available") === page;
+        return pageMatches && quote.length >= 12 && (sourceQuote.includes(quote) || (quote.includes(sourceQuote) && sourceQuote.length >= 12));
+      });
+      if (!matchedSource) {
         valid = false;
         break;
       }
-      verified.push({ documentName, page: String(citation.page || "not available"), quote: String(citation.quote).slice(0, 420) });
+      verified.push({ documentName, page, quote: String(citation.quote).slice(0, 420) });
     }
     if (!valid || verified.length !== documents.length) continue;
     accepted.push({
