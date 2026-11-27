@@ -111,9 +111,10 @@ async function analyzeChunk(chunk, deadlineAt, index, total, onFallback) {
     generationConfig: { temperature: 0.1, maxOutputTokens: 3500, responseMimeType: "application/json", responseSchema: SCHEMA },
     timeout: Math.min(16000, remaining - 2500),
     deadlineAt,
-    onFallback
+    onFallback,
+    validateResponse: ({ text }) => cleanJson(text)
   });
-  return cleanJson(generated.text);
+  return generated.validated;
 }
 
 export default async function handler(req, res) {
